@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestão de Consultas</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #0f766e;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-hover: #334155;
+            --text-light: #f1f5f9;
+            --text-gray: #94a3b8;
+            --border: #475569;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--text-light);
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        
+        .header {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .logo { font-size: 20px; font-weight: 700; color: var(--primary); }
+        
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #115e59; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-info { background: var(--info); color: white; }
+        .btn-info:hover { background: #2563eb; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: var(--bg-hover); color: var(--text-light); border: 1px solid var(--border); }
+
+        .month-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: var(--bg-dark);
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        .month-selector button {
+            background: transparent;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 16px;
+        }
+
+        .search-bar { flex: 1; min-width: 300px; }
+        .search-bar input {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-light);
+        }
+
+        .table-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .table-wrapper { 
+            overflow-x: auto; 
+            max-height: calc(100vh - 300px);
+            overflow-y: auto; 
+        }
+        
+        table { 
+            width: max-content;
+            border-collapse: collapse;
+            min-width: 100%;
+        }
+        
+        thead {
+            background: var(--bg-dark);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-gray);
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+
+        body:not(.tema-escuro) td {
+            border-right: 1px solid #cbd5e1;
+        }
+
+        body:not(.tema-escuro) th {
+            border-right: 1px solid #94a3b8;
+        }
+
+        body:not(.tema-escuro) table {
+            border: 1px solid #94a3b8;
+        }
+
+        tr:hover { background: var(--bg-hover); }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-em-analise, .status-analise { background: var(--info); color: white; }
+        .status-autorizada, .status-autorizado { background: var(--success); color: white; }
+        .status-cancelada, .status-cancelado, .status-cancelar { background: #dc2626; color: white; }
+        .status-suspensa, .status-suspenso { background: var(--warning); color: white; }
+        .status-encerrada, .status-encerrado { background: #b91c1c; color: white; }
+        .status-pendente { background: #f59e0b; color: white; }
+        .status-em-andamento, .status-andamento { background: #06b6d4; color: white; }
+        .status-aguardando { background: #8b5cf6; color: white; }
+        .status-aprovada, .status-aprovado { background: #059669; color: white; }
+        .status-reprovada, .status-reprovado { background: #ef4444; color: white; }
+        .status-concluida, .status-concluido { background: #10b981; color: white; }
+        
+        /* Novas situações */
+        .status-negado, .status-negada { background: #dc2626; color: white; }
+        .status-encaminhamento { background: #06b6d4; color: white; }
+        .status-assinado, .status-assinada { background: #10b981; color: white; }
+        .status-nao-fazer { background: #ef4444; color: white; }
+        .status-solicitacao { background: #f59e0b; color: white; }
+        .status-atestado { background: #3b82f6; color: white; }
+        
+        /* Fallback para qualquer situação não mapeada */
+        .status-badge:not([class*="status-"]) {
+            background: #64748b;
+            color: white;
+        }
+
+        .action-btns { display: flex; gap: 6px; }
+        .btn-icon { padding: 6px 8px; font-size: 12px; }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+
+        .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .modal-close { background: transparent; border: none; color: var(--text-gray); cursor: pointer; font-size: 24px; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 12px; font-weight: 600; color: var(--text-gray); }
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 10px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-light);
+        }
+
+        .form-group.full { grid-column: 1 / -1; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 16px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .empty { text-align: center; padding: 40px; color: var(--text-gray); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+        // Função para converter para Title Case (Primeira Letra Maiúscula)
+        const toTitleCase = (str) => {
+            if (!str) return '';
+            const preposicoes = ['de', 'da', 'das', 'do', 'dos', 'e'];
+            return str.toLowerCase().split(' ').map((word, index) => {
+                // Primeira palavra sempre maiúscula
+                if (index === 0) {
+                    return word.charAt(0).toUpperCase() + word.slice(1);
+                }
+                // Preposições ficam em minúsculo
+                if (preposicoes.includes(word)) {
+                    return word;
+                }
+                // Demais palavras com primeira letra maiúscula
+                return word.charAt(0).toUpperCase() + word.slice(1);
+            }).join(' ');
+        };
+
+        const DADOS_INICIAIS = {
+            convenios: ['Unimed', 'Santa Casa', 'Sul America', 'SFV'],
+            terapias: ['Psicologia', 'Fono', 'TO'],
+            responsaveis: ['Raissa', 'Silvia'],
+            cids: ['F41.1'],
+            cbos: ['225133'],
+            situacoes: ['Em Análise', 'Autorizada', 'Cancelada', 'Suspensa'],
+            diasSemana: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'],
+            unidades: ['Matriz', 'Filial'],
+            conselhos: ['66141', '111082']
+        };
+
+        const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzZEUYTaxpV2kt5a0MUfa9nMHXqwm9m-AmUNeRKmlvJdoS2NUchMijaKYuaDUIM4jYz/exec';
+
+        async function salvarNoSheets(aba, linhas) {
+            try {
+                if (linhas.length === 0) return;
+                const cabecalho = Object.keys(linhas[0]);
+                const LOTE = 200;
+                
+                // Primeiro lote: limpa a aba e envia cabeçalho
+                await fetch(SHEETS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ aba, modo: 'lote', cabecalho, linhas: linhas.slice(0, LOTE) })
+                });
+                
+                // Lotes seguintes
+                for (let i = LOTE; i < linhas.length; i += LOTE) {
+                    await new Promise(r => setTimeout(r, 500)); // pausa entre lotes
+                    await fetch(SHEETS_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ aba, modo: 'lote', cabecalho: null, linhas: linhas.slice(i, i + LOTE) })
+                    });
+                }
+            } catch (err) {
+                console.error('Erro ao salvar no Sheets:', err);
+            }
+        }
+
+        async function carregarDoSheets(aba) {
+            try {
+                const res = await fetch(`${SHEETS_URL}?aba=${encodeURIComponent(aba)}`);
+                const data = await res.json();
+                return data.linhas || [];
+            } catch (err) {
+                console.error('Erro ao carregar do Sheets:', err);
+                return null;
+            }
+        }
+
+        function App() {
+            const [user] = useState({ role: 'admin' });
+            const [mes, setMes] = useState(new Date().getMonth());
+            const [ano, setAno] = useState(new Date().getFullYear());
+            const [consultas, setConsultas] = useState([]);
+            const [carregando, setCarregando] = useState(false);
+            const [busca, setBusca] = useState('');
+            const [filtros, setFiltros] = useState({
+                convenio: '',
+                terapia: '',
+                situacao: '',
+                unidade: '',
+                senha: '',
+                profExecutor: ''
+            });
+            const [showModal, setShowModal] = useState(false);
+            const [modoModal, setModoModal] = useState('add');
+            const [editando, setEditando] = useState(null);
+            const [listas, setListas] = useState(DADOS_INICIAIS);
+            const [pagina, setPagina] = useState(1);
+            const [showConfig, setShowConfig] = useState(false);
+            const [temaEscuro, setTemaEscuro] = useState(true);
+            const [selectedIds, setSelectedIds] = useState([]);
+            const [navegandoMes, setNavegandoMes] = useState(false);
+            const porPagina = 50;
+
+            // Carregar dados do Google Sheets apenas na primeira abertura
+            const jaCarregou = React.useRef(false);
+            useEffect(() => {
+                if (jaCarregou.current) return;
+                jaCarregou.current = true;
+                const nomeAba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                setCarregando(true);
+                carregarDoSheets(nomeAba).then(linhas => {
+                    if (linhas && linhas.length > 0) {
+                        const convertidas = linhas.map((l, i) => ({ ...l, id: l.id || Date.now() + i }));
+                        setConsultas(convertidas);
+                    }
+                    setCarregando(false);
+                });
+            }, []);
+
+            // Salvar no Google Sheets apenas quando o usuário faz uma ação real
+            const salvarTimeout = React.useRef(null);
+            const ultimoSalvo = React.useRef('');
+
+            const salvarAgora = React.useCallback((lista, mesAtual, anoAtual) => {
+                const chave = JSON.stringify(lista.map(c => c.id));
+                if (chave === ultimoSalvo.current) return; // não salva se não mudou
+                ultimoSalvo.current = chave;
+                if (salvarTimeout.current) clearTimeout(salvarTimeout.current);
+                salvarTimeout.current = setTimeout(() => {
+                    const nomeAba = `${anoAtual}-${String(mesAtual+1).padStart(2,'0')}`;
+                    salvarNoSheets(nomeAba, lista);
+                }, 3000);
+            }, []);
+
+            useEffect(() => {
+                if (temaEscuro) {
+                    document.body.classList.add('tema-escuro');
+                    document.documentElement.style.setProperty('--bg-dark', '#0f172a');
+                    document.documentElement.style.setProperty('--bg-card', '#1e293b');
+                    document.documentElement.style.setProperty('--bg-hover', '#334155');
+                    document.documentElement.style.setProperty('--text-light', '#f1f5f9');
+                    document.documentElement.style.setProperty('--text-gray', '#94a3b8');
+                    document.documentElement.style.setProperty('--border', '#475569');
+                    document.body.style.background = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
+                } else {
+                    document.body.classList.remove('tema-escuro');
+                    document.documentElement.style.setProperty('--bg-dark', '#f8fafc');
+                    document.documentElement.style.setProperty('--bg-card', '#ffffff');
+                    document.documentElement.style.setProperty('--bg-hover', '#f1f5f9');
+                    document.documentElement.style.setProperty('--text-light', '#0f172a');
+                    document.documentElement.style.setProperty('--text-gray', '#64748b');
+                    document.documentElement.style.setProperty('--border', '#e2e8f0');
+                    document.body.style.background = 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
+                }
+            }, [temaEscuro]);
+
+            // Resetar página quando filtros ou busca mudarem
+            useEffect(() => {
+                setPagina(1);
+            }, [filtros, busca]);
+
+            const filtradas = useMemo(() => {
+                let resultado = consultas.filter(c => {
+                    if (c.mes !== mes || c.ano !== ano) return false;
+                    
+                    // OCULTAR CONSULTAS VAZIAS/INCOMPLETAS
+                    // Verifica se nome é válido (não vazio, não só espaços, tem conteúdo real)
+                    const nomeValido = c.nomePaciente && 
+                                      typeof c.nomePaciente === 'string' && 
+                                      c.nomePaciente.trim().length >= 3 && // Mínimo 3 caracteres
+                                      c.nomePaciente.trim() !== '⚠️ SEM NOME' &&
+                                      !/^[\s\u00A0]+$/.test(c.nomePaciente); // Não só espaços/nbsp
+                    
+                    if (!nomeValido) {
+                        console.log('⚠️ OCULTANDO consulta sem nome válido. Nome atual:', JSON.stringify(c.nomePaciente), 'Situação:', c.situacao);
+                        return false;
+                    }
+                    
+                    // Ocultar situações negativas APENAS se NÃO filtrou por situação
+                    if (!filtros.situacao) {
+                        const situacoesOcultas = ['cancelado', 'cancelada', 'negado', 'negada', 'encerrado', 'encerrada'];
+                        const situacaoNorm = (c.situacao || '').toLowerCase().trim();
+                        if (situacoesOcultas.includes(situacaoNorm)) {
+                            return false;
+                        }
+                    }
+                    
+                    // FILTROS PRIMEIRO (antes da busca)
+                    if (filtros.convenio && c.convenio !== filtros.convenio) return false;
+                    if (filtros.terapia && c.terapia !== filtros.terapia) return false;
+                    if (filtros.unidade && c.unidade !== filtros.unidade) return false;
+                    if (filtros.profExecutor && c.responsavelTecnico !== filtros.profExecutor) return false;
+                    
+                    // Filtro de situação (case-insensitive) com debug
+                    if (filtros.situacao) {
+                        const situacaoConsulta = (c.situacao || '').toString().trim().toLowerCase();
+                        const situacaoFiltro = filtros.situacao.toString().trim().toLowerCase();
+                        
+                        // Debug para identificar problema
+                        if (situacaoConsulta !== situacaoFiltro) {
+                            console.log(`FILTRADO: "${c.nomePaciente}" - Situação: "${c.situacao}" (normalizado: "${situacaoConsulta}") não corresponde ao filtro: "${situacaoFiltro}"`);
+                            return false;
+                        } else {
+                            console.log(`✅ PASSOU: "${c.nomePaciente}" - Situação: "${c.situacao}" corresponde ao filtro`);
+                        }
+                    }
+                    
+                    // Filtro de senha
+                    if (filtros.senha) {
+                        const senhaConsulta = String(c.senha || '').toLowerCase();
+                        const senhaFiltro = String(filtros.senha || '').toLowerCase();
+                        if (!senhaConsulta.includes(senhaFiltro)) {
+                            return false;
+                        }
+                    }
+                    
+                    // Busca POR ÚLTIMO (depois de todos os filtros)
+                    if (busca) {
+                        const termo = busca.toLowerCase().trim();
+                        
+                        // Busca por carteirinha (exato)
+                        if (c.numeroCarteirinha?.includes(termo)) {
+                            return true;
+                        }
+                        
+                        // Busca por nome
+                        const nomeCompleto = (c.nomePaciente || '').toLowerCase();
+                        const palavrasBusca = termo.split(' ').filter(p => p.length > 0);
+                        const palavrasNome = nomeCompleto.split(' ').filter(p => p.length > 0);
+                        
+                        if (palavrasBusca.length === 0) return true;
+                        if (palavrasNome.length === 0) return false;
+                        
+                        // REGRA 1: Primeiro nome deve começar com primeira palavra digitada
+                        if (!palavrasNome[0].startsWith(palavrasBusca[0])) {
+                            return false;
+                        }
+                        
+                        // REGRA 2: Se digitou mais palavras, todas devem existir no nome
+                        if (palavrasBusca.length > 1) {
+                            for (let i = 1; i < palavrasBusca.length; i++) {
+                                const encontrou = palavrasNome.some(pn => pn.startsWith(palavrasBusca[i]));
+                                if (!encontrou) return false;
+                            }
+                        }
+                        
+                        return true;
+                    }
+                    
+                    return true;
+                });
+                
+                // Ordenar por nome do paciente
+                resultado.sort((a, b) => {
+                    const nomeA = (a.nomePaciente || '').toLowerCase();
+                    const nomeB = (b.nomePaciente || '').toLowerCase();
+                    return nomeA.localeCompare(nomeB);
+                });
+                
+                // Guardar total antes de paginar
+                window.totalFiltradas = resultado.length;
+                
+                return resultado.slice((pagina - 1) * porPagina, pagina * porPagina);
+            }, [consultas, mes, ano, busca, filtros, pagina]);
+
+            const totalPaginas = Math.ceil((window.totalFiltradas || 0) / porPagina);
+
+            const handleAdd = (c) => {
+                const novaConsulta = { ...c, id: Date.now(), mes, ano };
+                const novasConsultas = [...consultas, novaConsulta];
+                setConsultas(novasConsultas);
+                setShowModal(false);
+                salvarAgora(novasConsultas, mes, ano);
+                
+                // Calcular em qual página o paciente ficou
+                setTimeout(() => {
+                    // Filtrar consultas do mês atual e ordenar
+                    const consultasDoMes = novasConsultas
+                        .filter(x => x.mes === mes && x.ano === ano)
+                        .sort((a, b) => {
+                            const nomeA = (a.nomePaciente || '').toLowerCase();
+                            const nomeB = (b.nomePaciente || '').toLowerCase();
+                            return nomeA.localeCompare(nomeB);
+                        });
+                    
+                    // Encontrar posição do paciente
+                    const posicao = consultasDoMes.findIndex(x => x.id === novaConsulta.id);
+                    const paginaPaciente = Math.floor(posicao / porPagina) + 1;
+                    const primeiraLetra = (c.nomePaciente || '').charAt(0).toUpperCase();
+                    
+                    // Mostrar mensagem com opção de ir para a página
+                    const irParaPagina = confirm(
+                        `✅ ${c.nomePaciente} adicionado(a)!\n\n` +
+                        `📍 Localização: Página ${paginaPaciente} (letra "${primeiraLetra}")\n` +
+                        `📊 Total no mês: ${consultasDoMes.length} consultas\n\n` +
+                        `Deseja ir para a página ${paginaPaciente}?`
+                    );
+                    
+                    if (irParaPagina) {
+                        setPagina(paginaPaciente);
+                    } else {
+                        setPagina(1); // Volta para primeira página
+                    }
+                }, 100);
+            };
+
+            const handleEdit = (c) => {
+                const novasConsultas = consultas.map(x => x.id === c.id ? c : x);
+                setConsultas(novasConsultas);
+                setShowModal(false);
+                salvarAgora(novasConsultas, mes, ano);
+            };
+
+            const handleDelete = (id) => {
+                if (confirm('Excluir?')) {
+                    const novasConsultas = consultas.filter(c => c.id !== id);
+                    setConsultas(novasConsultas);
+                    salvarAgora(novasConsultas, mes, ano);
+                }
+            };
+
+            const handleToggleSelect = (id) => {
+                if (selectedIds.includes(id)) {
+                    setSelectedIds(selectedIds.filter(sid => sid !== id));
+                } else {
+                    setSelectedIds([...selectedIds, id]);
+                }
+            };
+
+            const handleSelectAll = () => {
+                // Pegar TODAS as consultas filtradas, não só da página
+                const todasFiltradas = consultas.filter(c => {
+                    if (c.mes !== mes || c.ano !== ano) return false;
+                    
+                    if (busca) {
+                        const termo = busca.toLowerCase();
+                        const match = c.nomePaciente?.toLowerCase().includes(termo) ||
+                                     c.numeroCarteirinha?.includes(termo);
+                        if (!match) return false;
+                    }
+                    
+                    if (filtros.convenio && c.convenio !== filtros.convenio) return false;
+                    if (filtros.terapia && c.terapia !== filtros.terapia) return false;
+                    if (filtros.situacao && (c.situacao || '') !== filtros.situacao) return false;
+                    if (filtros.unidade && c.unidade !== filtros.unidade) return false;
+                    
+                    if (filtros.senha) {
+                        const senhaConsulta = String(c.senha || '').toLowerCase();
+                        const senhaFiltro = String(filtros.senha || '').toLowerCase();
+                        if (!senhaConsulta.includes(senhaFiltro)) return false;
+                    }
+                    
+                    return true;
+                });
+                
+                const idsTodasFiltradas = todasFiltradas.map(c => c.id);
+                setSelectedIds(idsTodasFiltradas);
+            };
+
+            const handleDeselectAll = () => {
+                setSelectedIds([]);
+            };
+
+            const handleDeleteSelected = () => {
+                if (selectedIds.length === 0) {
+                    alert('Nenhuma consulta selecionada!');
+                    return;
+                }
+                
+                if (confirm(`Excluir ${selectedIds.length} consultas selecionadas?`)) {
+                    setConsultas(consultas.filter(c => !selectedIds.includes(c.id)));
+                    setSelectedIds([]);
+                }
+            };
+
+            const handleStatus = (id, situacao) => {
+                setConsultas(consultas.map(c => c.id === id ? { ...c, situacao } : c));
+            };
+
+            const handleDupExata = (c) => {
+                setConsultas([...consultas, { ...c, id: Date.now() }]);
+            };
+
+            const handleDupEdit = (c) => {
+                const novo = {
+                    id: Date.now(),
+                    convenio: c.convenio,
+                    unidade: c.unidade,
+                    conselho: c.conselho,
+                    nomePaciente: c.nomePaciente,
+                    numeroCarteirinha: c.numeroCarteirinha,
+                    cid: c.cid,
+                    cbo: c.cbo,
+                    terapia: c.terapia,
+                    diaSemana: '', guia: '', data: '', senha: '', quantidade: '',
+                    nomeMedico: '', responsavelTecnico: '', situacao: '', obs: '',
+                    mes, ano
+                };
+                setConsultas([...consultas, novo]);
+                setEditando(novo);
+                setModoModal('edit');
+                setShowModal(true);
+            };
+
+            const handleDupMes = () => {
+                const doMes = consultas.filter(c => c.mes === mes && c.ano === ano);
+                if (!doMes.length) return alert('Sem consultas neste mês!');
+                if (!confirm(`Duplicar ${doMes.length} consultas?`)) return;
+
+                const proxMes = mes === 11 ? 0 : mes + 1;
+                const proxAno = mes === 11 ? ano + 1 : ano;
+
+                const novas = doMes.map(c => ({
+                    id: Date.now() + Math.random(),
+                    convenio: c.convenio,
+                    unidade: c.unidade,
+                    conselho: c.conselho,
+                    nomePaciente: c.nomePaciente,
+                    numeroCarteirinha: c.numeroCarteirinha,
+                    cid: c.cid,
+                    cbo: c.cbo,
+                    terapia: c.terapia,
+                    responsavelTecnico: c.responsavelTecnico,
+                    diaSemana: '', guia: '', data: '', senha: '', quantidade: '',
+                    nomeMedico: '', situacao: '', obs: '',
+                    mes: proxMes,
+                    ano: proxAno
+                }));
+
+                setConsultas([...consultas, ...novas]);
+                setMes(proxMes);
+                setAno(proxAno);
+                alert(`✅ ${novas.length} consultas duplicadas!`);
+            };
+
+            const handleImport = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const data = new Uint8Array(ev.target.result);
+                        const wb = XLSX.read(data, { type: 'array' });
+                        
+                        let imported = [];
+                        let novosValores = {
+                            convenios: new Set(listas.convenios),
+                            unidades: new Set(listas.unidades),
+                            terapias: new Set(listas.terapias),
+                            responsaveis: new Set(listas.responsaveis),
+                            conselhos: new Set(listas.conselhos),
+                            cids: new Set(listas.cids),
+                            cbos: new Set(listas.cbos),
+                            situacoes: new Set(listas.situacoes),
+                            diasSemana: new Set(listas.diasSemana)
+                        };
+
+                        wb.SheetNames.forEach((sheetName, idx) => {
+                            const ws = wb.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+                            // Identificar mês pelo nome da aba
+                            let mesImportado = idx; // padrão: usar posição
+                            
+                            // Normalizar nome da aba (remover acentos, espaços extras, lowercase)
+                            const nomeAbaNormalizado = sheetName
+                                .toLowerCase()
+                                .normalize('NFD')
+                                .replace(/[\u0300-\u036f]/g, '')
+                                .trim();
+                            
+                            console.log(`DEBUG: Aba "${sheetName}" normalizada como "${nomeAbaNormalizado}"`);
+                            
+                            // Procurar mês no nome da aba
+                            MESES.forEach((nomeMes, indexMes) => {
+                                const mesNormalizado = nomeMes
+                                    .toLowerCase()
+                                    .normalize('NFD')
+                                    .replace(/[\u0300-\u036f]/g, '');
+                                
+                                if (nomeAbaNormalizado.includes(mesNormalizado)) {
+                                    console.log(`DEBUG: "${nomeAbaNormalizado}" contém "${mesNormalizado}" -> Mês ${indexMes} (${nomeMes})`);
+                                    mesImportado = indexMes;
+                                }
+                            });
+                            
+                            console.log(`DEBUG: Importando aba "${sheetName}" como ${MESES[mesImportado]} (índice ${mesImportado})`);
+                            
+                            // Debug: mostrar colunas da primeira linha
+                            if (idx === 0 && json.length > 0) {
+                                console.log('=== COLUNAS ENCONTRADAS NA PLANILHA ===');
+                                Object.keys(json[0]).forEach((col, i) => {
+                                    console.log(`${i + 1}. "${col}"`);
+                                });
+                                console.log('========================================');
+                            }
+
+                            json.forEach((row, rowIndex) => {
+                                // Converter data do Excel se necessário
+                                let dataFormatada = '';
+                                if (row['DATA'] || row['DATA ']) {
+                                    const dataVal = row['DATA'] || row['DATA '];
+                                    if (typeof dataVal === 'number') {
+                                        // Data do Excel (número serial)
+                                        const date = new Date((dataVal - 25569) * 86400 * 1000);
+                                        dataFormatada = date.toISOString().split('T')[0];
+                                    } else {
+                                        dataFormatada = String(dataVal).trim();
+                                    }
+                                }
+
+                                const c = {
+                                    id: Date.now() + Math.random(),
+                                    convenio: String(row['CONVÊNIOS'] || row['CONVENIOS'] || row['CONVÊNIO'] || row['CONVENIO'] || '').trim(),
+                                    unidade: String(row['UNIDADE'] || '').trim(),
+                                    diaSemana: String(row['SEMANA'] || row['DIA DA SEMANA'] || row[' SEMANA'] || '').trim(),
+                                    guia: String(row['GUIA'] || row['GUIA '] || '').trim(),
+                                    data: dataFormatada,
+                                    senha: String(row['SENHA'] || '').trim(),
+                                    numeroCarteirinha: String(row['CARTEIRINHA'] || '').trim(),
+                                    nomePaciente: String(row['NOME DO PACIENTE'] || row['NOME DO PACIENTE '] || row['NOME'] || '').trim(),
+                                    terapia: String(row['TERAPIA'] || '').trim(),
+                                    quantidade: String(row['QUANT'] || row['QUANTIDADE'] || '').trim(),
+                                    nomeMedico: String(row['PROFISSIONAL SOLICITANTE'] || row['PROFISSIONAL SOLICITANTE '] || '').trim(),
+                                    conselho: String(row['CONSELHO'] || '').trim(),
+                                    cbo: String(row['CBO'] || '').trim(),
+                                    cid: String(row['CID'] || '').trim(),
+                                    responsavelTecnico: String(
+                                        row['PROF.EXEC.'] ||
+                                        row['PROFISSIONAL EXECUTOR'] || 
+                                        row['PROFISSIONAL EXECUTANTE'] ||
+                                        row['Prof.executor'] || 
+                                        row['PROF.EXECUTOR'] || 
+                                        row['Prof. Executor'] || 
+                                        row['Prof.Executor'] || 
+                                        row['PROF. EXECUTOR'] ||
+                                        row['PROF. EXECUTANTE'] ||
+                                        row['Prof. Executante'] ||
+                                        ''
+                                    ).trim(),
+                                    obs: String(row['OBSERVAÇÃO'] || row['OBSERVACAO'] || '').trim(),
+                                    situacao: String(row['SITUAÇÃO'] || row['SITUACAO'] || '').trim(),
+                                    mes: mesImportado,
+                                    ano: ano
+                                };
+
+                                if (c.convenio) novosValores.convenios.add(c.convenio);
+                                if (c.unidade) novosValores.unidades.add(c.unidade);
+                                if (c.terapia) novosValores.terapias.add(c.terapia);
+                                if (c.responsavelTecnico) novosValores.responsaveis.add(c.responsavelTecnico);
+                                if (c.conselho) novosValores.conselhos.add(c.conselho);
+                                if (c.cid) novosValores.cids.add(c.cid);
+                                if (c.cbo) novosValores.cbos.add(c.cbo);
+                                if (c.situacao) novosValores.situacoes.add(c.situacao);
+                                if (c.diaSemana) novosValores.diasSemana.add(c.diaSemana);
+
+                                if (c.nomePaciente) {
+                                    imported.push(c);
+                                } else if (rowIndex < 5) {
+                                    // Mostrar primeiras 5 linhas ignoradas para debug
+                                    console.warn(`LINHA ${rowIndex + 2} IGNORADA (sem nome de paciente):`, row);
+                                }
+                            });
+                        });
+
+                        console.log(`DEBUG: Total de linhas processadas: ${wb.SheetNames.reduce((acc, name) => acc + XLSX.utils.sheet_to_json(wb.Sheets[name]).length, 0)}`);
+                        console.log(`DEBUG: Total de linhas importadas: ${imported.length}`);
+                        console.log(`DEBUG: Linhas com nome de paciente válido: ${imported.length}`);
+
+                        setListas({
+                            convenios: Array.from(novosValores.convenios),
+                            unidades: Array.from(novosValores.unidades),
+                            terapias: Array.from(novosValores.terapias),
+                            responsaveis: Array.from(novosValores.responsaveis),
+                            conselhos: Array.from(novosValores.conselhos),
+                            cids: Array.from(novosValores.cids),
+                            cbos: Array.from(novosValores.cbos),
+                            situacoes: Array.from(novosValores.situacoes),
+                            diasSemana: Array.from(novosValores.diasSemana)
+                        });
+
+                        setConsultas([...consultas, ...imported]);
+                        
+                        // Ir para o primeiro mês que tem dados importados
+                        if (imported.length > 0) {
+                            setMes(imported[0].mes);
+                            setAno(imported[0].ano);
+                        }
+                        
+                        setPagina(1);
+                        alert(`✅ ${imported.length} consultas importadas de ${wb.SheetNames.length} abas!\n\nVocê está vendo: ${MESES[imported[0]?.mes || 0]} ${imported[0]?.ano || ano}`);
+                        e.target.value = '';
+                    } catch (err) {
+                        alert('❌ Erro ao importar: ' + err.message + '\n\nVerifique se o arquivo está no formato correto.');
+                        console.error(err);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            };
+
+            const handleExport = () => {
+                try {
+                    const wb = XLSX.utils.book_new();
+                    const porMes = {};
+
+                    consultas.forEach(c => {
+                        const m = MESES[c.mes];
+                        if (!porMes[m]) porMes[m] = [];
+                        porMes[m].push(c);
+                    });
+
+                    Object.keys(porMes).forEach(m => {
+                        const dados = porMes[m].map(c => ({
+                            'CONVÊNIOS': c.convenio,
+                            'UNIDADE': c.unidade,
+                            'SEMANA': c.diaSemana,
+                            'GUIA': c.guia,
+                            'DATA': c.data,
+                            'SENHA': c.senha,
+                            'CARTEIRINHA': c.numeroCarteirinha,
+                            'NOME DO PACIENTE': c.nomePaciente,
+                            'TERAPIA': c.terapia,
+                            'QUANT': c.quantidade,
+                            'PROFISSIONAL SOLICITANTE': c.nomeMedico,
+                            'CONSELHO': c.conselho,
+                            'CBO': c.cbo,
+                            'CID': c.cid,
+                            'Prof.executor': c.responsavelTecnico,
+                            'OBSERVAÇÃO': c.obs,
+                            'SITUAÇÃO': c.situacao
+                        }));
+
+                        const ws = XLSX.utils.json_to_sheet(dados);
+                        XLSX.utils.book_append_sheet(wb, ws, m);
+                    });
+
+                    XLSX.writeFile(wb, `Consultas_${new Date().toISOString().split('T')[0]}.xlsx`);
+                    alert('✅ Arquivo exportado!');
+                } catch (err) {
+                    alert('❌ Erro ao exportar: ' + err.message);
+                }
+            };
+
+            const addToList = (listName, value) => {
+                if (value && value.trim() && !listas[listName].includes(value.trim())) {
+                    const newListas = {
+                        ...listas,
+                        [listName]: [...listas[listName], value.trim()]
+                    };
+                    setListas(newListas);
+                    return true;
+                }
+                return false;
+            };
+
+            const removeFromList = (listName, value) => {
+                const newListas = {
+                    ...listas,
+                    [listName]: listas[listName].filter(item => item !== value)
+                };
+                setListas(newListas);
+            };
+            
+            const removeMultipleFromList = (listName, values) => {
+                const newListas = {
+                    ...listas,
+                    [listName]: listas[listName].filter(item => !values.includes(item))
+                };
+                setListas(newListas);
+            };
+
+            if (showConfig) {
+                return <ConfigScreen 
+                    listas={listas} 
+                    addToList={addToList} 
+                    removeFromList={removeFromList} 
+                    removeMultipleFromList={removeMultipleFromList}
+                    onClose={() => setShowConfig(false)} 
+                    temaEscuro={temaEscuro} 
+                    setTemaEscuro={setTemaEscuro} 
+                />;
+            }
+
+            return (
+                <div className="container">
+                    {carregando && (
+                        <div style={{position:'fixed',top:'10px',right:'10px',background:'rgba(0,0,0,0.8)',zIndex:9999,padding:'10px 16px',borderRadius:'8px',display:'flex',alignItems:'center',gap:'8px'}}>
+                            <div style={{fontSize:'16px'}}>⏳</div>
+                            <div style={{color:'white',fontSize:'14px'}}>Carregando dados...</div>
+                        </div>
+                    )}
+                    <div className="header">
+                        <div className="header-top">
+                            <div className="logo">🏥 Sistema de Consultas</div>
+                            <div style={{display: 'flex', gap: '10px'}}>
+                                <button className="btn btn-secondary" onClick={() => setTemaEscuro(!temaEscuro)}>
+                                    {temaEscuro ? '☀️ Claro' : '🌙 Escuro'}
+                                </button>
+                                <button className="btn btn-secondary" onClick={() => setShowConfig(true)}>
+                                    ⚙️ Configurações
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="controls">
+                            <div className="month-selector">
+                                <button 
+                                    onClick={() => {
+                                        if (navegandoMes) return;
+                                        setNavegandoMes(true);
+                                        setPagina(1); // Volta para página 1 ao mudar de mês
+                                        if (mes === 0) { 
+                                            setMes(11); 
+                                            setAno(ano - 1); 
+                                        } else {
+                                            setMes(mes - 1);
+                                        }
+                                        setTimeout(() => setNavegandoMes(false), 300);
+                                    }}
+                                    disabled={navegandoMes}
+                                >◀</button>
+                                <span style={{minWidth: '140px', textAlign: 'center'}}>{MESES[mes]} {ano}</span>
+                                <button 
+                                    onClick={() => {
+                                        if (navegandoMes) return;
+                                        setNavegandoMes(true);
+                                        setPagina(1); // Volta para página 1 ao mudar de mês
+                                        if (mes === 11) { 
+                                            setMes(0); 
+                                            setAno(ano + 1); 
+                                        } else {
+                                            setMes(mes + 1);
+                                        }
+                                        setTimeout(() => setNavegandoMes(false), 300);
+                                    }}
+                                    disabled={navegandoMes}
+                                >▶</button>
+                            </div>
+                            
+                            <div style={{
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                color: 'white',
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
+                            }}>
+                                📅 Visualizando: {MESES[mes]} {ano}
+                                {mes === new Date().getMonth() && ano === new Date().getFullYear() && (
+                                    <span style={{
+                                        background: 'rgba(255,255,255,0.3)',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '11px'
+                                    }}>MÊS ATUAL</span>
+                                )}
+                            </div>
+
+                            <div className="search-bar">
+                                <input
+                                    type="text"
+                                    placeholder="🔍 Buscar paciente ou carteirinha..."
+                                    value={busca}
+                                    onChange={(e) => setBusca(e.target.value)}
+                                />
+                            </div>
+
+                            <button className="btn btn-primary" onClick={() => {
+                                setModoModal('add');
+                                setEditando(null);
+                                setShowModal(true);
+                            }}>
+                                ➕ Nova
+                            </button>
+
+                            {user.role === 'admin' && (
+                                <>
+                                    <button className="btn btn-warning" onClick={() => document.getElementById('fileInput').click()}>
+                                        📥 Importar
+                                    </button>
+                                    <input
+                                        id="fileInput"
+                                        type="file"
+                                        accept=".xlsx,.xls"
+                                        style={{display: 'none'}}
+                                        onChange={handleImport}
+                                    />
+                                    <button className="btn btn-info" onClick={handleExport}>
+                                        📤 Exportar
+                                    </button>
+                                    <button className="btn btn-success" onClick={handleDupMes}>
+                                        📅 Duplicar Mês
+                                    </button>
+                                    
+                                    {selectedIds.length > 0 && (
+                                        <button className="btn btn-danger" onClick={handleDeleteSelected}>
+                                            🗑️ Excluir ({selectedIds.length})
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                        <div style={{display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap'}}>
+                            <select 
+                                value={filtros.convenio} 
+                                onChange={(e) => setFiltros({...filtros, convenio: e.target.value})}
+                                style={{padding: '8px 12px', background: 'var(--bg-dark)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-light)', fontSize: '13px'}}
+                            >
+                                <option value="">Todos Convênios</option>
+                                {listas.convenios.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+
+                            <select 
+                                value={filtros.unidade} 
+                                onChange={(e) => setFiltros({...filtros, unidade: e.target.value})}
+                                style={{padding: '8px 12px', background: 'var(--bg-dark)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-light)', fontSize: '13px'}}
+                            >
+                                <option value="">Todas Unidades</option>
+                                {listas.unidades.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+
+                            <select 
+                                value={filtros.terapia} 
+                                onChange={(e) => setFiltros({...filtros, terapia: e.target.value})}
+                                style={{padding: '8px 12px', background: 'var(--bg-dark)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-light)', fontSize: '13px'}}
+                            >
+                                <option value="">Todas Terapias</option>
+                                {listas.terapias.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+
+                            <select 
+                                value={filtros.situacao} 
+                                onChange={(e) => setFiltros({...filtros, situacao: e.target.value})}
+                                style={{padding: '8px 12px', background: 'var(--bg-dark)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-light)', fontSize: '13px'}}
+                            >
+                                <option value="">Todas Situações</option>
+                                {listas.situacoes.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+
+                            <select 
+                                value={filtros.profExecutor} 
+                                onChange={(e) => setFiltros({...filtros, profExecutor: e.target.value})}
+                                style={{padding: '8px 12px', background: 'var(--bg-dark)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-light)', fontSize: '13px'}}
+                            >
+                                <option value="">Todos Executores</option>
+                                {listas.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+
+                            <input
+                                type="text"
+                                placeholder="Filtrar por Senha..."
+                                value={filtros.senha}
+                                onChange={(e) => {
+                                    console.log('Filtro senha digitado:', e.target.value);
+                                    setFiltros({...filtros, senha: e.target.value});
+                                }}
+                                style={{
+                                    padding: '8px 12px', 
+                                    background: filtros.senha ? '#fef3c7' : 'var(--bg-dark)', 
+                                    border: filtros.senha ? '2px solid #f59e0b' : '1px solid var(--border)', 
+                                    borderRadius: '6px', 
+                                    color: filtros.senha ? '#92400e' : 'var(--text-light)', 
+                                    fontSize: '13px', 
+                                    fontWeight: filtros.senha ? '700' : '400',
+                                    width: '150px'
+                                }}
+                            />
+
+                            {(filtros.convenio || filtros.unidade || filtros.terapia || filtros.situacao || filtros.profExecutor || filtros.senha || busca) && (
+                                <button 
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setFiltros({convenio: '', terapia: '', situacao: '', unidade: '', profExecutor: '', senha: ''});
+                                        setBusca('');
+                                    }}
+                                    style={{fontSize: '13px', padding: '8px 12px'}}
+                                >
+                                    🔄 Limpar Filtros
+                                </button>
+                            )}
+                        </div>
+
+                        {user.role === 'admin' && filtradas.length > 0 && (
+                            <div style={{display: 'flex', gap: '10px', marginTop: '10px'}}>
+                                <button 
+                                    className="btn btn-secondary"
+                                    onClick={handleSelectAll}
+                                    style={{fontSize: '13px', padding: '6px 12px'}}
+                                >
+                                    ☑️ Selecionar Todos ({window.totalFiltradas || 0})
+                                </button>
+                                <button 
+                                    className="btn btn-secondary"
+                                    onClick={handleDeselectAll}
+                                    style={{fontSize: '13px', padding: '6px 12px'}}
+                                >
+                                    ⬜ Desmarcar Todos
+                                </button>
+                                {selectedIds.length > 0 && (
+                                    <span style={{
+                                        padding: '6px 12px',
+                                        background: '#3b82f6',
+                                        borderRadius: '6px',
+                                        fontSize: '13px',
+                                        fontWeight: '600'
+                                    }}>
+                                        {selectedIds.length} selecionada(s)
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="table-container">
+                        <div className="table-wrapper">
+                            {filtradas.length > 0 ? (
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            {user.role === 'admin' && <th style={{width: '40px'}}>☑️</th>}
+                                            <th>Convênio</th>
+                                            <th>Unidade</th>
+                                            <th>Semana</th>
+                                            <th>Guia</th>
+                                            <th>Data</th>
+                                            <th>Senha</th>
+                                            <th>Carteirinha</th>
+                                            <th>Paciente</th>
+                                            <th>Terapia</th>
+                                            <th>Qtd</th>
+                                            <th>Prof.Solic.</th>
+                                            <th>Conselho</th>
+                                            <th>CBO</th>
+                                            <th>CID</th>
+                                            <th>Prof.Exec.</th>
+                                            <th>Obs</th>
+                                            <th>Situação</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filtradas.map(c => (
+                                            <tr key={c.id}>
+                                                {user.role === 'admin' && (
+                                                    <td>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIds.includes(c.id)}
+                                                            onChange={() => handleToggleSelect(c.id)}
+                                                            style={{
+                                                                width: '18px',
+                                                                height: '18px',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        />
+                                                    </td>
+                                                )}
+                                                <td>{c.convenio}</td>
+                                                <td>{c.unidade}</td>
+                                                <td>{c.diaSemana}</td>
+                                                <td>{c.guia}</td>
+                                                <td>{c.data ? new Date(c.data + 'T00:00:00').toLocaleDateString('pt-BR') : ''}</td>
+                                                <td>{c.senha}</td>
+                                                <td>{c.numeroCarteirinha}</td>
+                                                <td>
+                                                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                                        <strong style={{
+                                                            color: c.nomePaciente && c.nomePaciente.trim() ? 'inherit' : '#ef4444',
+                                                            fontStyle: c.nomePaciente && c.nomePaciente.trim() ? 'normal' : 'italic'
+                                                        }}>
+                                                            {c.nomePaciente && c.nomePaciente.trim() ? c.nomePaciente : '⚠️ SEM NOME'}
+                                                        </strong>
+                                                        <select 
+                                                            value={c.situacao || ''}
+                                                            onChange={(e) => handleStatus(c.id, e.target.value)}
+                                                            className={`status-badge ${c.situacao ? 'status-' + c.situacao.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-') : ''}`}
+                                                            style={{
+                                                                border: 'none',
+                                                                cursor: 'pointer',
+                                                                fontWeight: '600',
+                                                                fontSize: '10px',
+                                                                background: c.situacao ? undefined : '#64748b'
+                                                            }}
+                                                        >
+                                                            <option value="">--</option>
+                                                            {listas.situacoes.map(s => (
+                                                                <option key={s} value={s}>{s}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </td>
+                                                <td>{c.terapia}</td>
+                                                <td>
+                                                    <input 
+                                                        type="number"
+                                                        value={c.quantidade || ''}
+                                                        onChange={(e) => {
+                                                            const novaQtd = e.target.value;
+                                                            const consultasAtualizadas = consultas.map(cons => 
+                                                                cons.id === c.id 
+                                                                    ? {...cons, quantidade: novaQtd}
+                                                                    : cons
+                                                            );
+                                                            setConsultas(consultasAtualizadas);
+                                                        }}
+                                                        style={{
+                                                            width: '60px',
+                                                            padding: '4px 8px',
+                                                            background: 'var(--bg-dark)',
+                                                            border: '1px solid var(--border)',
+                                                            borderRadius: '4px',
+                                                            color: 'var(--text-light)',
+                                                            fontSize: '13px',
+                                                            textAlign: 'center'
+                                                        }}
+                                                        min="0"
+                                                    />
+                                                </td>
+                                                <td>{c.nomeMedico}</td>
+                                                <td>{c.conselho}</td>
+                                                <td>{c.cbo}</td>
+                                                <td>{c.cid}</td>
+                                                <td>{c.responsavelTecnico}</td>
+                                                <td>{c.obs}</td>
+                                                <td>
+                                                    <span className={`status-badge ${c.situacao ? 'status-' + c.situacao.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-') : ''}`}>
+                                                        {c.situacao}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div className="action-btns">
+                                                        <button className="btn btn-icon btn-secondary" onClick={() => {
+                                                            setEditando(c);
+                                                            setModoModal('edit');
+                                                            setShowModal(true);
+                                                        }}>✏️</button>
+                                                        <button className="btn btn-icon btn-primary" onClick={() => handleDupExata(c)}>📋</button>
+                                                        <button className="btn btn-icon btn-success" onClick={() => handleDupEdit(c)}>✨</button>
+                                                        {user.role === 'admin' && (
+                                                            <button className="btn btn-icon btn-danger" onClick={() => handleDelete(c.id)}>🗑️</button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="empty">
+                                    <div style={{fontSize: '48px', marginBottom: '16px'}}>📋</div>
+                                    <h3>Nenhuma consulta encontrada</h3>
+                                    <p>Importe sua planilha ou adicione uma nova consulta</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {totalPaginas > 1 && (
+                        <div className="pagination">
+                            <button className="btn btn-secondary" onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1}>◀ Anterior</button>
+                            <span>Página {pagina} de {totalPaginas} ({window.totalFiltradas || 0} registros)</span>
+                            <button className="btn btn-secondary" onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}>Próxima ▶</button>
+                        </div>
+                    )}
+
+                    {showModal && (
+                        <Modal
+                            key={JSON.stringify(listas)}
+                            modo={modoModal}
+                            consulta={editando}
+                            listas={listas}
+                            onSave={modoModal === 'add' ? handleAdd : handleEdit}
+                            onClose={() => setShowModal(false)}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        function ConfigScreen({ listas, addToList, removeFromList, removeMultipleFromList, onClose, temaEscuro, setTemaEscuro }) {
+            const [newValues, setNewValues] = useState({
+                convenios: '',
+                unidades: '',
+                terapias: '',
+                responsaveis: '',
+                conselhos: '',
+                cids: '',
+                cbos: '',
+                situacoes: '',
+                diasSemana: ''
+            });
+            
+            const [selected, setSelected] = useState({
+                convenios: [],
+                unidades: [],
+                terapias: [],
+                responsaveis: [],
+                conselhos: [],
+                cids: [],
+                cbos: [],
+                situacoes: [],
+                diasSemana: []
+            });
+
+            const listConfigs = [
+                { key: 'convenios', label: 'Convênios', icon: '🏥' },
+                { key: 'unidades', label: 'Unidades', icon: '🏢' },
+                { key: 'terapias', label: 'Terapias', icon: '💊' },
+                { key: 'responsaveis', label: 'Profissionais Executores', icon: '👨‍⚕️' },
+                { key: 'conselhos', label: 'Conselhos', icon: '🎓' },
+                { key: 'cids', label: 'CIDs', icon: '📋' },
+                { key: 'cbos', label: 'CBOs', icon: '🔢' },
+                { key: 'situacoes', label: 'Situações', icon: '📊' },
+                { key: 'diasSemana', label: 'Dias da Semana', icon: '📅' }
+            ];
+            
+            const toggleSelection = (key, item) => {
+                if (selected[key].includes(item)) {
+                    setSelected({...selected, [key]: selected[key].filter(i => i !== item)});
+                } else {
+                    setSelected({...selected, [key]: [...selected[key], item]});
+                }
+            };
+            
+            const toggleSelectAll = (key) => {
+                if (selected[key].length === listas[key].length) {
+                    setSelected({...selected, [key]: []});
+                } else {
+                    setSelected({...selected, [key]: [...listas[key]]});
+                }
+            };
+            
+            const deleteSelected = (key) => {
+                if (selected[key].length === 0) {
+                    alert('Nenhum item selecionado!');
+                    return;
+                }
+                
+                if (confirm(`Excluir ${selected[key].length} item(ns) selecionado(s)?`)) {
+                    removeMultipleFromList(key, selected[key]);
+                    setSelected({...selected, [key]: []});
+                }
+            };
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <div className="header-top">
+                            <h2>⚙️ Configurações - Gerenciar Listas</h2>
+                            <div style={{display: 'flex', gap: '10px'}}>
+                                <button className="btn btn-secondary" onClick={() => setTemaEscuro(!temaEscuro)}>
+                                    {temaEscuro ? '☀️ Claro' : '🌙 Escuro'}
+                                </button>
+                                <button className="btn btn-secondary" onClick={onClose}>
+                                    ← Voltar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {listConfigs.map(({ key, label, icon }) => (
+                        <div key={key} style={{
+                            background: 'var(--bg-card)',
+                            padding: '20px',
+                            borderRadius: '12px',
+                            marginBottom: '20px',
+                            border: '1px solid var(--border)'
+                        }}>
+                            <h3 style={{marginBottom: '16px', color: 'var(--primary)'}}>{icon} {label}</h3>
+                            
+                            {/* Botões de seleção e exclusão */}
+                            {listas[key].length > 0 && (
+                                <div style={{display: 'flex', gap: '8px', marginBottom: '12px'}}>
+                                    <button 
+                                        className="btn btn-secondary"
+                                        onClick={() => toggleSelectAll(key)}
+                                        style={{fontSize: '12px', padding: '6px 12px'}}
+                                    >
+                                        {selected[key].length === listas[key].length ? '⬜ Desmarcar Todos' : '☑️ Selecionar Todos'}
+                                    </button>
+                                    {selected[key].length > 0 && (
+                                        <button 
+                                            className="btn btn-danger"
+                                            onClick={() => deleteSelected(key)}
+                                            style={{fontSize: '12px', padding: '6px 12px'}}
+                                        >
+                                            🗑️ Excluir ({selected[key].length})
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                            
+                            <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+                                {listas[key].map(item => (
+                                    <div key={item} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        padding: '10px',
+                                        background: selected[key].includes(item) ? '#3b82f6' : 'var(--bg-dark)',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border)',
+                                        transition: 'background 0.2s'
+                                    }}>
+                                        <input 
+                                            type="checkbox"
+                                            checked={selected[key].includes(item)}
+                                            onChange={() => toggleSelection(key, item)}
+                                            style={{
+                                                width: '18px',
+                                                height: '18px',
+                                                cursor: 'pointer'
+                                            }}
+                                        />
+                                        <span style={{flex: 1}}>{item}</span>
+                                        <button 
+                                            className="btn btn-icon btn-danger"
+                                            onClick={() => removeFromList(key, item)}
+                                            style={{fontSize: '12px', padding: '4px 8px'}}
+                                        >
+                                            🗑️
+                                        </button>
+                                    </div>
+                                ))}
+                                
+                                <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
+                                    <input
+                                        type="text"
+                                        placeholder={`Adicionar ${label.toLowerCase()}...`}
+                                        value={newValues[key]}
+                                        onChange={(e) => setNewValues({...newValues, [key]: e.target.value})}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter' && newValues[key].trim()) {
+                                                if (addToList(key, newValues[key])) {
+                                                    setNewValues({...newValues, [key]: ''});
+                                                } else {
+                                                    alert('Este item já existe ou está vazio!');
+                                                }
+                                            }
+                                        }}
+                                        style={{
+                                            flex: 1,
+                                            padding: '10px',
+                                            background: 'var(--bg-dark)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: '6px',
+                                            color: 'var(--text-light)'
+                                        }}
+                                    />
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => {
+                                            if (newValues[key].trim()) {
+                                                if (addToList(key, newValues[key])) {
+                                                    setNewValues({...newValues, [key]: ''});
+                                                } else {
+                                                    alert('Este item já existe ou está vazio!');
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        ➕ Adicionar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        function Modal({ modo, consulta, listas, onSave, onClose }) {
+            const [form, setForm] = useState(consulta || {
+                convenio: '', unidade: '', diaSemana: '', guia: '', data: '', senha: '',
+                numeroCarteirinha: '', nomePaciente: '', terapia: '', quantidade: '',
+                nomeMedico: '', conselho: '', cbo: '', cid: '', responsavelTecnico: '',
+                obs: '', situacao: ''
+            });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!form.nomePaciente || !form.convenio) return alert('Preencha os campos obrigatórios!');
+                onSave(form);
+            };
+
+            const handleDateChange = (value) => {
+                setForm({...form, data: value});
+            };
+
+            return (
+                <div className="modal" onClick={onClose}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>{modo === 'add' ? '➕ Nova Consulta' : '✏️ Editar Consulta'}</h2>
+                            <button className="modal-close" onClick={onClose}>×</button>
+                        </div>
+
+                        <form onSubmit={handleSubmit}>
+                            <div className="form-grid">
+                                <div className="form-group">
+                                    <label>Convênio *</label>
+                                    <select value={form.convenio} onChange={(e) => setForm({...form, convenio: e.target.value})} required>
+                                        <option value="">Selecione...</option>
+                                        {listas.convenios.map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Unidade</label>
+                                    <select value={form.unidade} onChange={(e) => setForm({...form, unidade: e.target.value})}>
+                                        <option value="">Selecione...</option>
+                                        {listas.unidades.map(u => <option key={u}>{u}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Semana</label>
+                                    <select value={form.diaSemana} onChange={(e) => setForm({...form, diaSemana: e.target.value})}>
+                                        <option value="">Selecione...</option>
+                                        {listas.diasSemana.map(d => <option key={d}>{d}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Guia</label>
+                                    <input type="text" value={form.guia || ''} onChange={(e) => setForm({...form, guia: e.target.value})} />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Data</label>
+                                    <input 
+                                        type="date" 
+                                        value={form.data || ''} 
+                                        onChange={(e) => handleDateChange(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Senha</label>
+                                    <input type="text" value={form.senha || ''} onChange={(e) => setForm({...form, senha: e.target.value})} />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Carteirinha</label>
+                                    <input type="text" value={form.numeroCarteirinha || ''} onChange={(e) => setForm({...form, numeroCarteirinha: e.target.value})} />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Nome Paciente *</label>
+                                    <input 
+                                        type="text" 
+                                        value={form.nomePaciente || ''} 
+                                        onChange={(e) => setForm({...form, nomePaciente: e.target.value})}
+                                        onBlur={(e) => setForm({...form, nomePaciente: toTitleCase(e.target.value)})}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Terapia</label>
+                                    <select value={form.terapia} onChange={(e) => setForm({...form, terapia: e.target.value})}>
+                                        <option value="">Selecione...</option>
+                                        {listas.terapias.map(t => <option key={t}>{t}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Quantidade</label>
+                                    <input type="number" value={form.quantidade || ''} onChange={(e) => setForm({...form, quantidade: e.target.value})} />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Prof. Solicitante</label>
+                                    <input 
+                                        type="text" 
+                                        value={form.nomeMedico || ''} 
+                                        onChange={(e) => setForm({...form, nomeMedico: e.target.value})}
+                                        onBlur={(e) => setForm({...form, nomeMedico: toTitleCase(e.target.value)})}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Conselho</label>
+                                    <select value={form.conselho} onChange={(e) => setForm({...form, conselho: e.target.value})}>
+                                        <option value="">Selecione...</option>
+                                        {listas.conselhos.map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>CBO</label>
+                                    <select value={form.cbo} onChange={(e) => setForm({...form, cbo: e.target.value})}>
+                                        <option value="">Selecione...</option>
+                                        {listas.cbos.map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>CID</label>
+                                    <select value={form.cid} onChange={(e) => setForm({...form, cid: e.target.value})}>
+                                        <option value="">Selecione...</option>
+                                        {listas.cids.map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Prof. Executor</label>
+                                    <select value={form.responsavelTecnico} onChange={(e) => setForm({...form, responsavelTecnico: e.target.value})}>
+                                        <option value="">Selecione...</option>
+                                        {listas.responsaveis.map(r => <option key={r}>{r}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Situação</label>
+                                    <select value={form.situacao} onChange={(e) => setForm({...form, situacao: e.target.value})}>
+                                        <option value="">Selecione...</option>
+                                        {listas.situacoes.map(s => <option key={s}>{s}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="form-group full">
+                                    <label>Observações</label>
+                                    <textarea rows="3" value={form.obs || ''} onChange={(e) => setForm({...form, obs: e.target.value})} />
+                                </div>
+                            </div>
+
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+                                <button type="submit" className="btn btn-primary">{modo === 'add' ? '➕ Adicionar' : '💾 Salvar'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
