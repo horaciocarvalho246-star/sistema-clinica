@@ -291,35 +291,28 @@
             conselhos: ['66141', '111082']
         };
 
+
         const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzZEUYTaxpV2kt5a0MUfa9nMHXqwm9m-AmUNeRKmlvJdoS2NUchMijaKYuaDUIM4jYz/exec';
 
         async function salvarNoSheets(aba, linhas) {
             try {
-                if (linhas.length === 0) return;
+                if (!linhas || linhas.length === 0) return;
                 const cabecalho = Object.keys(linhas[0]);
                 const LOTE = 200;
-                
-                // Primeiro lote: limpa a aba e envia cabeçalho
                 await fetch(SHEETS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
+                    method: 'POST', mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ aba, modo: 'lote', cabecalho, linhas: linhas.slice(0, LOTE) })
                 });
-                
-                // Lotes seguintes
                 for (let i = LOTE; i < linhas.length; i += LOTE) {
-                    await new Promise(r => setTimeout(r, 500)); // pausa entre lotes
+                    await new Promise(r => setTimeout(r, 600));
                     await fetch(SHEETS_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
+                        method: 'POST', mode: 'no-cors',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ aba, modo: 'lote', cabecalho: null, linhas: linhas.slice(i, i + LOTE) })
                     });
                 }
-            } catch (err) {
-                console.error('Erro ao salvar no Sheets:', err);
-            }
+            } catch(e) { console.error('Sheets save error:', e); }
         }
 
         async function carregarDoSheets(aba) {
@@ -327,18 +320,15 @@
                 const res = await fetch(`${SHEETS_URL}?aba=${encodeURIComponent(aba)}`);
                 const data = await res.json();
                 return data.linhas || [];
-            } catch (err) {
-                console.error('Erro ao carregar do Sheets:', err);
-                return null;
-            }
+            } catch(e) { return null; }
         }
 
-        function App() {
+                function App() {
             const [user] = useState({ role: 'admin' });
             const [mes, setMes] = useState(new Date().getMonth());
             const [ano, setAno] = useState(new Date().getFullYear());
             const [consultas, setConsultas] = useState([]);
-            const [carregando, setCarregando] = useState(false);
+            const jaCarregou = React.useRef(false);
             const [busca, setBusca] = useState('');
             const [filtros, setFiltros] = useState({
                 convenio: '',
@@ -358,37 +348,44 @@
             const [selectedIds, setSelectedIds] = useState([]);
             const [navegandoMes, setNavegandoMes] = useState(false);
             const porPagina = 50;
+            const [temAtualizacao, setTemAtualizacao] = useState(false);
+            const [salvando, setSalvando] = useState(false);
+            const ultimaVersaoSheets = React.useRef('');
 
-            // Carregar dados do Google Sheets apenas na primeira abertura
-            const jaCarregou = React.useRef(false);
+            // Carregar do Sheets uma vez ao abrir
             useEffect(() => {
                 if (jaCarregou.current) return;
                 jaCarregou.current = true;
-                const nomeAba = `${ano}-${String(mes+1).padStart(2,'0')}`;
-                setCarregando(true);
-                carregarDoSheets(nomeAba).then(linhas => {
+                const aba = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+                carregarDoSheets(aba).then(linhas => {
                     if (linhas && linhas.length > 0) {
-                        const convertidas = linhas.map((l, i) => ({ ...l, id: l.id || Date.now() + i }));
-                        setConsultas(convertidas);
+                        setConsultas(linhas.map((l, i) => ({ ...l, id: l.id || Date.now() + i })));
+                        ultimaVersaoSheets.current = JSON.stringify(linhas);
                     }
-                    setCarregando(false);
                 });
             }, []);
 
-            // Salvar no Google Sheets apenas quando o usuário faz uma ação real
-            const salvarTimeout = React.useRef(null);
-            const ultimoSalvo = React.useRef('');
+            // Verificar atualizações a cada 3 minutos
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                    carregarDoSheets(aba).then(linhas => {
+                        if (linhas && JSON.stringify(linhas) !== ultimaVersaoSheets.current) {
+                            ultimaVersaoSheets.current = JSON.stringify(linhas);
+                            setTemAtualizacao(true);
+                        }
+                    });
+                }, 3 * 60 * 1000);
+                return () => clearInterval(timer);
+            }, [mes, ano]);
 
-            const salvarAgora = React.useCallback((lista, mesAtual, anoAtual) => {
-                const chave = JSON.stringify(lista.map(c => c.id));
-                if (chave === ultimoSalvo.current) return; // não salva se não mudou
-                ultimoSalvo.current = chave;
-                if (salvarTimeout.current) clearTimeout(salvarTimeout.current);
-                salvarTimeout.current = setTimeout(() => {
-                    const nomeAba = `${anoAtual}-${String(mesAtual+1).padStart(2,'0')}`;
-                    salvarNoSheets(nomeAba, lista);
-                }, 3000);
-            }, []);
+            // Função para salvar no Sheets
+            const salvar = React.useCallback(async (lista) => {
+                setSalvando(true);
+                const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                await salvarNoSheets(aba, lista);
+                setSalvando(false);
+            }, [mes, ano]);
 
             useEffect(() => {
                 if (temaEscuro) {
@@ -477,7 +474,7 @@
                         const termo = busca.toLowerCase().trim();
                         
                         // Busca por carteirinha (exato)
-                        if (c.numeroCarteirinha?.includes(termo)) {
+                        if (String(c.numeroCarteirinha || '').includes(termo)) {
                             return true;
                         }
                         
@@ -517,9 +514,8 @@
                 
                 // Guardar total antes de paginar
                 window.totalFiltradas = resultado.length;
-                
-                return resultado.slice((pagina - 1) * porPagina, pagina * porPagina);
-            }, [consultas, mes, ano, busca, filtros, pagina]);
+                return resultado;
+            }, [consultas, mes, ano, busca, filtros]);
 
             const totalPaginas = Math.ceil((window.totalFiltradas || 0) / porPagina);
 
@@ -527,8 +523,8 @@
                 const novaConsulta = { ...c, id: Date.now(), mes, ano };
                 const novasConsultas = [...consultas, novaConsulta];
                 setConsultas(novasConsultas);
+                salvar(novasConsultas);
                 setShowModal(false);
-                salvarAgora(novasConsultas, mes, ano);
                 
                 // Calcular em qual página o paciente ficou
                 setTimeout(() => {
@@ -563,18 +559,14 @@
             };
 
             const handleEdit = (c) => {
-                const novasConsultas = consultas.map(x => x.id === c.id ? c : x);
-                setConsultas(novasConsultas);
+                const novas = consultas.map(x => x.id === c.id ? c : x);
+                setConsultas(novas);
+                salvar(novas);
                 setShowModal(false);
-                salvarAgora(novasConsultas, mes, ano);
             };
 
             const handleDelete = (id) => {
-                if (confirm('Excluir?')) {
-                    const novasConsultas = consultas.filter(c => c.id !== id);
-                    setConsultas(novasConsultas);
-                    salvarAgora(novasConsultas, mes, ano);
-                }
+                if (confirm('Excluir?')) setConsultas(consultas.filter(c => c.id !== id));
             };
 
             const handleToggleSelect = (id) => {
@@ -593,7 +585,7 @@
                     if (busca) {
                         const termo = busca.toLowerCase();
                         const match = c.nomePaciente?.toLowerCase().includes(termo) ||
-                                     c.numeroCarteirinha?.includes(termo);
+                                     String(c.numeroCarteirinha || '').includes(termo);
                         if (!match) return false;
                     }
                     
@@ -942,10 +934,23 @@
 
             return (
                 <div className="container">
-                    {carregando && (
-                        <div style={{position:'fixed',top:'10px',right:'10px',background:'rgba(0,0,0,0.8)',zIndex:9999,padding:'10px 16px',borderRadius:'8px',display:'flex',alignItems:'center',gap:'8px'}}>
-                            <div style={{fontSize:'16px'}}>⏳</div>
-                            <div style={{color:'white',fontSize:'14px'}}>Carregando dados...</div>
+                    {temAtualizacao && (
+                        <div onClick={() => {
+                            const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                            carregarDoSheets(aba).then(linhas => {
+                                if (linhas && linhas.length > 0) {
+                                    setConsultas(linhas.map((l, i) => ({ ...l, id: l.id || Date.now() + i })));
+                                    ultimaVersaoSheets.current = JSON.stringify(linhas);
+                                }
+                                setTemAtualizacao(false);
+                            });
+                        }} style={{cursor:'pointer',background:'#f59e0b',color:'white',textAlign:'center',padding:'8px',fontWeight:'bold',fontSize:'14px'}}>
+                            🔔 Há atualizações disponíveis! Clique aqui para carregar.
+                        </div>
+                    )}
+                    {salvando && (
+                        <div style={{position:'fixed',bottom:'16px',right:'16px',background:'#1e40af',color:'white',padding:'8px 16px',borderRadius:'8px',fontSize:'13px',zIndex:999}}>
+                            💾 Salvando no Google Sheets...
                         </div>
                     )}
                     <div className="header">
@@ -1203,7 +1208,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filtradas.map(c => (
+                                        {filtradas.slice((pagina - 1) * porPagina, pagina * porPagina).map(c => (
                                             <tr key={c.id}>
                                                 {user.role === 'admin' && (
                                                     <td>
@@ -1408,6 +1413,25 @@
 
             return (
                 <div className="container">
+                    {temAtualizacao && (
+                        <div onClick={() => {
+                            const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                            carregarDoSheets(aba).then(linhas => {
+                                if (linhas && linhas.length > 0) {
+                                    setConsultas(linhas.map((l, i) => ({ ...l, id: l.id || Date.now() + i })));
+                                    ultimaVersaoSheets.current = JSON.stringify(linhas);
+                                }
+                                setTemAtualizacao(false);
+                            });
+                        }} style={{cursor:'pointer',background:'#f59e0b',color:'white',textAlign:'center',padding:'8px',fontWeight:'bold',fontSize:'14px'}}>
+                            🔔 Há atualizações disponíveis! Clique aqui para carregar.
+                        </div>
+                    )}
+                    {salvando && (
+                        <div style={{position:'fixed',bottom:'16px',right:'16px',background:'#1e40af',color:'white',padding:'8px 16px',borderRadius:'8px',fontSize:'13px',zIndex:999}}>
+                            💾 Salvando no Google Sheets...
+                        </div>
+                    )}
                     <div className="header">
                         <div className="header-top">
                             <h2>⚙️ Configurações - Gerenciar Listas</h2>
