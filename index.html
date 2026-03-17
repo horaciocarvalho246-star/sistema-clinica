@@ -359,7 +359,13 @@
                 const aba = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
                 carregarDoSheets(aba).then(linhas => {
                     if (linhas && linhas.length > 0) {
-                        setConsultas(linhas.map((l, i) => ({ ...l, id: l.id || Date.now() + i })));
+                        setConsultas(linhas.map((l, i) => ({ 
+                            ...l, 
+                            id: l.id || Date.now() + i,
+                            mes: Number(l.mes),
+                            ano: Number(l.ano),
+                            quantidade: l.quantidade !== '' ? Number(l.quantidade) : ''
+                        })));
                         ultimaVersaoSheets.current = JSON.stringify(linhas);
                     }
                 });
@@ -416,7 +422,7 @@
 
             const filtradas = useMemo(() => {
                 let resultado = consultas.filter(c => {
-                    if (c.mes !== mes || c.ano !== ano) return false;
+                    if (Number(c.mes) !== Number(mes) || Number(c.ano) !== Number(ano)) return false;
                     
                     // OCULTAR CONSULTAS VAZIAS/INCOMPLETAS
                     // Verifica se nome é válido (não vazio, não só espaços, tem conteúdo real)
@@ -530,7 +536,7 @@
                 setTimeout(() => {
                     // Filtrar consultas do mês atual e ordenar
                     const consultasDoMes = novasConsultas
-                        .filter(x => x.mes === mes && x.ano === ano)
+                        .filter(x => Number(x.mes) === Number(mes) && Number(x.ano) === Number(ano))
                         .sort((a, b) => {
                             const nomeA = (a.nomePaciente || '').toLowerCase();
                             const nomeB = (b.nomePaciente || '').toLowerCase();
@@ -584,7 +590,7 @@
             const handleSelectAll = () => {
                 // Pegar TODAS as consultas filtradas, não só da página
                 const todasFiltradas = consultas.filter(c => {
-                    if (c.mes !== mes || c.ano !== ano) return false;
+                    if (Number(c.mes) !== Number(mes) || Number(c.ano) !== Number(ano)) return false;
                     
                     if (busca) {
                         const termo = busca.toLowerCase();
@@ -665,7 +671,7 @@
             };
 
             const handleDupMes = () => {
-                const doMes = consultas.filter(c => c.mes === mes && c.ano === ano);
+                const doMes = consultas.filter(c => Number(c.mes) === Number(mes) && Number(c.ano) === Number(ano));
                 if (!doMes.length) return alert('Sem consultas neste mês!');
                 if (!confirm(`Duplicar ${doMes.length} consultas?`)) return;
 
@@ -955,7 +961,13 @@
                             const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
                             carregarDoSheets(aba).then(linhas => {
                                 if (linhas && linhas.length > 0) {
-                                    setConsultas(linhas.map((l, i) => ({ ...l, id: l.id || Date.now() + i })));
+                                    setConsultas(linhas.map((l, i) => ({ 
+                                        ...l, 
+                                        id: l.id || Date.now() + i,
+                                        mes: Number(l.mes),
+                                        ano: Number(l.ano),
+                                        quantidade: l.quantidade !== '' ? Number(l.quantidade) : ''
+                                    })));
                                     ultimaVersaoSheets.current = JSON.stringify(linhas);
                                 }
                                 setTemAtualizacao(false);
@@ -1435,7 +1447,13 @@
                             const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
                             carregarDoSheets(aba).then(linhas => {
                                 if (linhas && linhas.length > 0) {
-                                    setConsultas(linhas.map((l, i) => ({ ...l, id: l.id || Date.now() + i })));
+                                    setConsultas(linhas.map((l, i) => ({ 
+                                        ...l, 
+                                        id: l.id || Date.now() + i,
+                                        mes: Number(l.mes),
+                                        ano: Number(l.ano),
+                                        quantidade: l.quantidade !== '' ? Number(l.quantidade) : ''
+                                    })));
                                     ultimaVersaoSheets.current = JSON.stringify(linhas);
                                 }
                                 setTemAtualizacao(false);
