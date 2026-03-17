@@ -566,7 +566,11 @@
             };
 
             const handleDelete = (id) => {
-                if (confirm('Excluir?')) setConsultas(consultas.filter(c => c.id !== id));
+                if (confirm('Excluir?')) {
+                    const novas = consultas.filter(c => c.id !== id);
+                    setConsultas(novas);
+                    salvar(novas);
+                }
             };
 
             const handleToggleSelect = (id) => {
@@ -618,17 +622,23 @@
                 }
                 
                 if (confirm(`Excluir ${selectedIds.length} consultas selecionadas?`)) {
-                    setConsultas(consultas.filter(c => !selectedIds.includes(c.id)));
+                    const novas = consultas.filter(c => !selectedIds.includes(c.id));
+                    setConsultas(novas);
+                    salvar(novas);
                     setSelectedIds([]);
                 }
             };
 
             const handleStatus = (id, situacao) => {
-                setConsultas(consultas.map(c => c.id === id ? { ...c, situacao } : c));
+                const novas = consultas.map(c => c.id === id ? { ...c, situacao } : c);
+                setConsultas(novas);
+                salvar(novas);
             };
 
             const handleDupExata = (c) => {
-                setConsultas([...consultas, { ...c, id: Date.now() }]);
+                const novas = [...consultas, { ...c, id: Date.now() }];
+                setConsultas(novas);
+                salvar(novas);
             };
 
             const handleDupEdit = (c) => {
@@ -646,7 +656,9 @@
                     nomeMedico: '', responsavelTecnico: '', situacao: '', obs: '',
                     mes, ano
                 };
-                setConsultas([...consultas, novo]);
+                const novaLista = [...consultas, novo];
+                setConsultas(novaLista);
+                salvar(novaLista);
                 setEditando(novo);
                 setModoModal('edit');
                 setShowModal(true);
@@ -677,7 +689,9 @@
                     ano: proxAno
                 }));
 
-                setConsultas([...consultas, ...novas]);
+                const novaLista = [...consultas, ...novas];
+                setConsultas(novaLista);
+                salvar(novaLista);
                 setMes(proxMes);
                 setAno(proxAno);
                 alert(`✅ ${novas.length} consultas duplicadas!`);
@@ -830,7 +844,9 @@
                             diasSemana: Array.from(novosValores.diasSemana)
                         });
 
-                        setConsultas([...consultas, ...imported]);
+                        const novaLista = [...consultas, ...imported];
+                        setConsultas(novaLista);
+                        salvar(novaLista);
                         
                         // Ir para o primeiro mês que tem dados importados
                         if (imported.length > 0) {
@@ -1271,6 +1287,7 @@
                                                                     : cons
                                                             );
                                                             setConsultas(consultasAtualizadas);
+                                                            salvar(consultasAtualizadas);
                                                         }}
                                                         style={{
                                                             width: '60px',
