@@ -102,12 +102,53 @@
             border-radius: 12px;
             overflow: hidden;
             border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
         }
 
         .table-wrapper { 
-            overflow-x: auto; 
-            max-height: calc(100vh - 300px);
-            overflow-y: auto; 
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: calc(100vh - 340px);
+            position: relative;
+            scrollbar-width: thin;
+            scrollbar-color: #475569 #1e293b;
+        }
+
+        .scroll-top-bar {
+            overflow-x: auto;
+            overflow-y: hidden;
+            height: 12px;
+            scrollbar-width: thin;
+            scrollbar-color: #475569 #1e293b;
+        }
+        .scroll-top-bar::-webkit-scrollbar {
+            height: 10px;
+        }
+        .scroll-top-bar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .scroll-top-bar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        .scroll-top-bar-inner {
+            height: 1px;
+        }
+        
+        .table-wrapper::-webkit-scrollbar {
+            height: 10px;
+            width: 8px;
+        }
+        .table-wrapper::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .table-wrapper::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        .table-wrapper::-webkit-scrollbar-corner {
+            background: #1e293b;
         }
         
         table { 
@@ -121,6 +162,32 @@
             position: sticky;
             top: 0;
             z-index: 10;
+        }
+        
+        .col-sticky-1 {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: var(--bg-card);
+        }
+        .col-sticky-2 {
+            position: sticky;
+            left: 110px;
+            z-index: 2;
+            background: var(--bg-card);
+        }
+        .col-sticky-3 {
+            position: sticky;
+            left: 200px;
+            z-index: 2;
+            background: var(--bg-card);
+            border-right: 2px solid var(--border);
+        }
+        thead .col-sticky-1,
+        thead .col-sticky-2,
+        thead .col-sticky-3 {
+            background: var(--bg-dark);
+            z-index: 3;
         }
 
         th {
@@ -169,11 +236,42 @@
             font-weight: 600;
             text-transform: uppercase;
         }
+        
+        .situacao-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .situacao-wrapper select {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 2;
+        }
+        .situacao-label {
+            display: inline-block;
+            padding: 4px 18px 4px 10px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: white;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .situacao-label::after {
+            content: ' ▾';
+            font-size: 9px;
+        }
 
-        .status-em-analise, .status-analise { background: var(--info); color: white; }
-        .status-autorizada, .status-autorizado { background: var(--success); color: white; }
-        .status-cancelada, .status-cancelado, .status-cancelar { background: #dc2626; color: white; }
-        .status-suspensa, .status-suspenso { background: var(--warning); color: white; }
+        .status-autorizada, .status-autorizado { background: #16a34a; color: white; }
+        .status-negada, .status-negado { background: #dc2626; color: white; }
+        .status-cancelada, .status-cancelado { background: #dc2626; color: white; }
+        .status-analise, .status-em-analise { background: #2563eb; color: white; }
+        .status-solicitacao { background: #ca8a04; color: white; }
+        .status-suspenso, .status-suspensa { background: #6b7280; color: white; }
+        .status-faturado { background: #ea580c; color: white; }
         .status-encerrada, .status-encerrado { background: #b91c1c; color: white; }
         .status-pendente { background: #f59e0b; color: white; }
         .status-em-andamento, .status-andamento { background: #06b6d4; color: white; }
@@ -183,12 +281,14 @@
         .status-concluida, .status-concluido { background: #10b981; color: white; }
         
         /* Novas situações */
-        .status-negado, .status-negada { background: #dc2626; color: white; }
+
         .status-encaminhamento { background: #06b6d4; color: white; }
         .status-assinado, .status-assinada { background: #10b981; color: white; }
         .status-nao-fazer { background: #ef4444; color: white; }
-        .status-solicitacao { background: #f59e0b; color: white; }
+
         .status-atestado { background: #3b82f6; color: white; }
+        
+
         
         /* Fallback para qualquer situação não mapeada */
         .status-badge:not([class*="status-"]) {
@@ -255,6 +355,59 @@
 </head>
 <body>
     <div id="root"></div>
+    <script>
+    function ajustarAltura() {
+        var wrapper = document.querySelector('.table-wrapper');
+        if (!wrapper) return;
+        var rect = wrapper.getBoundingClientRect();
+        var altura = window.innerHeight - rect.top - 20;
+        wrapper.style.maxHeight = Math.max(150, altura) + 'px';
+    }
+
+    function sincronizarScroll() {
+        var wrapper = document.getElementById('tableWrapper');
+        var topBar = document.getElementById('scrollTopBar');
+        var topBarInner = document.getElementById('scrollTopBarInner');
+        if (!wrapper || !topBar || !topBarInner) return;
+
+        // Ajusta largura do inner para corresponder ao scroll width da tabela
+        var table = wrapper.querySelector('table');
+        if (table) {
+            topBarInner.style.width = table.scrollWidth + 'px';
+        }
+
+        // Sincroniza scroll
+        var syncingFromTop = false;
+        var syncingFromWrapper = false;
+
+        topBar.addEventListener('scroll', function() {
+            if (syncingFromWrapper) return;
+            syncingFromTop = true;
+            wrapper.scrollLeft = topBar.scrollLeft;
+            syncingFromTop = false;
+        });
+
+        wrapper.addEventListener('scroll', function() {
+            if (syncingFromTop) return;
+            syncingFromWrapper = true;
+            topBar.scrollLeft = wrapper.scrollLeft;
+            syncingFromWrapper = false;
+        });
+    }
+
+    window.addEventListener('resize', ajustarAltura);
+    var obs = new MutationObserver(function(){ 
+        setTimeout(ajustarAltura, 100);
+        setTimeout(sincronizarScroll, 200);
+    });
+    document.addEventListener('DOMContentLoaded', function() {
+        obs.observe(document.getElementById('root'), { childList: true, subtree: true });
+        setTimeout(ajustarAltura, 800);
+        setTimeout(ajustarAltura, 2000);
+        setTimeout(sincronizarScroll, 1000);
+        setTimeout(sincronizarScroll, 2500);
+    });
+    </script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
@@ -364,7 +517,8 @@
                             id: l.id || Date.now() + i,
                             mes: Number(l.mes),
                             ano: Number(l.ano),
-                            quantidade: l.quantidade !== '' ? Number(l.quantidade) : ''
+                            quantidade: l.quantidade !== '' ? Number(l.quantidade) : '',
+                            terapia: String(l.terapia !== undefined && l.terapia !== null ? l.terapia : '').trim()
                         })));
                         ultimaVersaoSheets.current = JSON.stringify(linhas);
                     }
@@ -437,18 +591,17 @@
                         return false;
                     }
                     
-                    // Ocultar situações negativas APENAS se NÃO filtrou por situação
+                    // Ocultar cancelados APENAS se NÃO filtrou por situação
                     if (!filtros.situacao) {
-                        const situacoesOcultas = ['cancelado', 'cancelada', 'negado', 'negada', 'encerrado', 'encerrada'];
-                        const situacaoNorm = (c.situacao || '').toLowerCase().trim();
-                        if (situacoesOcultas.includes(situacaoNorm)) {
+                        const situacaoNorm = (c.situacao || '').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        if (situacaoNorm.includes('cancelad')) {
                             return false;
                         }
                     }
                     
                     // FILTROS PRIMEIRO (antes da busca)
                     if (filtros.convenio && c.convenio !== filtros.convenio) return false;
-                    if (filtros.terapia && c.terapia !== filtros.terapia) return false;
+                    if (filtros.terapia && String(c.terapia).trim() !== String(filtros.terapia).trim()) return false;
                     if (filtros.unidade && c.unidade !== filtros.unidade) return false;
                     if (filtros.profExecutor && c.responsavelTecnico !== filtros.profExecutor) return false;
                     
@@ -520,6 +673,14 @@
                 
                 // Guardar total antes de paginar
                 window.totalFiltradas = resultado.length;
+                window.totalCanceladas = consultas.filter(c => 
+                    Number(c.mes) === Number(mes) && Number(c.ano) === Number(ano) &&
+                    (c.situacao || '').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes('cancelad')
+                ).length;
+                window.totalGeral = consultas.filter(c =>
+                    Number(c.mes) === Number(mes) && Number(c.ano) === Number(ano)
+                ).length;
+                window.totalAtivos = window.totalGeral - window.totalCanceladas;
                 return resultado;
             }, [consultas, mes, ano, busca, filtros]);
 
@@ -600,7 +761,7 @@
                     }
                     
                     if (filtros.convenio && c.convenio !== filtros.convenio) return false;
-                    if (filtros.terapia && c.terapia !== filtros.terapia) return false;
+                    if (filtros.terapia && String(c.terapia).trim() !== String(filtros.terapia).trim()) return false;
                     if (filtros.situacao && (c.situacao || '') !== filtros.situacao) return false;
                     if (filtros.unidade && c.unidade !== filtros.unidade) return false;
                     
@@ -671,9 +832,39 @@
             };
 
             const handleDupMes = () => {
-                const doMes = consultas.filter(c => Number(c.mes) === Number(mes) && Number(c.ano) === Number(ano));
-                if (!doMes.length) return alert('Sem consultas neste mês!');
-                if (!confirm(`Duplicar ${doMes.length} consultas?`)) return;
+                // Verificar se já existe registro no próximo mês
+                const proxMesCheck = mes === 11 ? 0 : mes + 1;
+                const proxAnoCheck = mes === 11 ? ano + 1 : ano;
+                const jaExisteProxMes = consultas.some(c => Number(c.mes) === proxMesCheck && Number(c.ano) === proxAnoCheck);
+                if (jaExisteProxMes) {
+                    const nomeMesProx = MESES[proxMesCheck];
+                    alert('⚠️ ' + nomeMesProx + ' já possui registros!\n\nApague todos os registros de ' + nomeMesProx + ' antes de duplicar.');
+                    return;
+                }
+                // Verificar se tem filtro ativo
+                const temFiltro = filtros.convenio || filtros.terapia || filtros.situacao || filtros.unidade || filtros.profExecutor || busca;
+                if (temFiltro) {
+                    alert('⚠️ Para duplicar o mês, remova todos os filtros ativos primeiro!\n\nClique em "Limpar Filtros" e tente novamente.');
+                    return;
+                }
+                
+                const situacoesExcluir = ['cancelado', 'cancelada'];
+                const doMes = consultas.filter(c => {
+                    if (Number(c.mes) !== Number(mes) || Number(c.ano) !== Number(ano)) return false;
+                    const sit = (c.situacao || '').toLowerCase().trim();
+                    if (situacoesExcluir.includes(sit)) return false;
+                    return true;
+                });
+                if (!doMes.length) return alert('Sem consultas elegíveis neste mês!');
+                const cancelados = consultas.filter(c => {
+                    if (Number(c.mes) !== Number(mes) || Number(c.ano) !== Number(ano)) return false;
+                    const sit = (c.situacao || '').toLowerCase().trim();
+                    return situacoesExcluir.includes(sit);
+                });
+                const msg = cancelados.length > 0 
+                    ? `Duplicar ${doMes.length} consultas para o próximo mês?\n\n(${cancelados.length} canceladas serão ignoradas)`
+                    : `Duplicar ${doMes.length} consultas para o próximo mês?`;
+                if (!confirm(msg)) return;
 
                 const proxMes = mes === 11 ? 0 : mes + 1;
                 const proxAno = mes === 11 ? ano + 1 : ano;
@@ -790,7 +981,7 @@
                                     senha: String(row['SENHA'] || '').trim(),
                                     numeroCarteirinha: String(row['CARTEIRINHA'] || '').trim(),
                                     nomePaciente: String(row['NOME DO PACIENTE'] || row['NOME DO PACIENTE '] || row['NOME'] || '').trim(),
-                                    terapia: String(row['TERAPIA'] || '').trim(),
+                                    terapia: String(row['TERAPIA'] !== undefined && row['TERAPIA'] !== null ? row['TERAPIA'] : '').trim(),
                                     quantidade: String(row['QUANT'] || row['QUANTIDADE'] || '').trim(),
                                     nomeMedico: String(row['PROFISSIONAL SOLICITANTE'] || row['PROFISSIONAL SOLICITANTE '] || '').trim(),
                                     conselho: String(row['CONSELHO'] || '').trim(),
@@ -817,7 +1008,7 @@
 
                                 if (c.convenio) novosValores.convenios.add(c.convenio);
                                 if (c.unidade) novosValores.unidades.add(c.unidade);
-                                if (c.terapia) novosValores.terapias.add(c.terapia);
+                                if (c.terapia !== '') novosValores.terapias.add(c.terapia);
                                 if (c.responsavelTecnico) novosValores.responsaveis.add(c.responsavelTecnico);
                                 if (c.conselho) novosValores.conselhos.add(c.conselho);
                                 if (c.cid) novosValores.cids.add(c.cid);
@@ -892,7 +1083,7 @@
                             'SENHA': c.senha,
                             'CARTEIRINHA': c.numeroCarteirinha,
                             'NOME DO PACIENTE': c.nomePaciente,
-                            'TERAPIA': c.terapia,
+                            'TERAPIA': String(c.terapia || ''),
                             'QUANT': c.quantidade,
                             'PROFISSIONAL SOLICITANTE': c.nomeMedico,
                             'CONSELHO': c.conselho,
@@ -950,7 +1141,14 @@
                     removeMultipleFromList={removeMultipleFromList}
                     onClose={() => setShowConfig(false)} 
                     temaEscuro={temaEscuro} 
-                    setTemaEscuro={setTemaEscuro} 
+                    setTemaEscuro={setTemaEscuro}
+                    temAtualizacao={temAtualizacao}
+                    salvando={salvando}
+                    ano={ano}
+                    mes={mes}
+                    setConsultas={setConsultas}
+                    setTemAtualizacao={setTemAtualizacao}
+                    ultimaVersaoSheets={ultimaVersaoSheets}
                 />;
             }
 
@@ -966,7 +1164,8 @@
                                         id: l.id || Date.now() + i,
                                         mes: Number(l.mes),
                                         ano: Number(l.ano),
-                                        quantidade: l.quantidade !== '' ? Number(l.quantidade) : ''
+                                        quantidade: l.quantidade !== '' ? Number(l.quantidade) : '',
+                            terapia: String(l.terapia !== undefined && l.terapia !== null ? l.terapia : '').trim()
                                     })));
                                     ultimaVersaoSheets.current = JSON.stringify(linhas);
                                 }
@@ -999,8 +1198,13 @@
                                 <button 
                                     onClick={() => {
                                         if (navegandoMes) return;
+                                        const temFiltro = filtros.convenio || filtros.terapia || filtros.situacao || filtros.unidade || filtros.profExecutor || busca;
+                                        if (temFiltro) {
+                                            alert('⚠️ Há filtros ativos! Limpe os filtros antes de navegar entre os meses.');
+                                            return;
+                                        }
                                         setNavegandoMes(true);
-                                        setPagina(1); // Volta para página 1 ao mudar de mês
+                                        setPagina(1);
                                         if (mes === 0) { 
                                             setMes(11); 
                                             setAno(ano - 1); 
@@ -1015,8 +1219,13 @@
                                 <button 
                                     onClick={() => {
                                         if (navegandoMes) return;
+                                        const temFiltro = filtros.convenio || filtros.terapia || filtros.situacao || filtros.unidade || filtros.profExecutor || busca;
+                                        if (temFiltro) {
+                                            alert('⚠️ Há filtros ativos! Limpe os filtros antes de navegar entre os meses.');
+                                            return;
+                                        }
                                         setNavegandoMes(true);
-                                        setPagina(1); // Volta para página 1 ao mudar de mês
+                                        setPagina(1);
                                         if (mes === 11) { 
                                             setMes(0); 
                                             setAno(ano + 1); 
@@ -1184,7 +1393,7 @@
                                     onClick={handleSelectAll}
                                     style={{fontSize: '13px', padding: '6px 12px'}}
                                 >
-                                    ☑️ Selecionar Todos ({window.totalFiltradas || 0})
+                                    ☑️ Selecionar Todos (Ativos: {window.totalAtivos || 0} | Cancelados: {window.totalCanceladas || 0} | Total: {window.totalGeral || 0})
                                 </button>
                                 <button 
                                     className="btn btn-secondary"
@@ -1209,20 +1418,21 @@
                     </div>
 
                     <div className="table-container">
-                        <div className="table-wrapper">
+                        <div className="scroll-top-bar" id="scrollTopBar"><div className="scroll-top-bar-inner" id="scrollTopBarInner"></div></div>
+                        <div className="table-wrapper" id="tableWrapper">
                             {filtradas.length > 0 ? (
                                 <table>
                                     <thead>
                                         <tr>
                                             {user.role === 'admin' && <th style={{width: '40px'}}>☑️</th>}
-                                            <th>Convênio</th>
-                                            <th>Unidade</th>
+                                            <th className="col-sticky-1" style={{minWidth:'110px'}}>Convênio</th>
+                                            <th className="col-sticky-2" style={{minWidth:'90px'}}>Unidade</th>
                                             <th>Semana</th>
                                             <th>Guia</th>
                                             <th>Data</th>
                                             <th>Senha</th>
                                             <th>Carteirinha</th>
-                                            <th>Paciente</th>
+                                            <th className="col-sticky-3" style={{minWidth:'180px'}}>Paciente</th>
                                             <th>Terapia</th>
                                             <th>Qtd</th>
                                             <th>Prof.Solic.</th>
@@ -1252,14 +1462,14 @@
                                                         />
                                                     </td>
                                                 )}
-                                                <td>{c.convenio}</td>
-                                                <td>{c.unidade}</td>
+                                                <td className="col-sticky-1">{c.convenio}</td>
+                                                <td className="col-sticky-2">{c.unidade}</td>
                                                 <td>{c.diaSemana}</td>
                                                 <td>{c.guia}</td>
                                                 <td>{c.data ? new Date(c.data + 'T00:00:00').toLocaleDateString('pt-BR') : ''}</td>
                                                 <td>{c.senha}</td>
                                                 <td>{c.numeroCarteirinha}</td>
-                                                <td>
+                                                <td className="col-sticky-3">
                                                     <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                                                         <strong style={{
                                                             color: c.nomePaciente && c.nomePaciente.trim() ? 'inherit' : '#ef4444',
@@ -1267,23 +1477,22 @@
                                                         }}>
                                                             {c.nomePaciente && c.nomePaciente.trim() ? c.nomePaciente : '⚠️ SEM NOME'}
                                                         </strong>
+                                                        <div className="situacao-wrapper">
+                                                        <span className={`situacao-label ${c.situacao ? 'status-' + c.situacao.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-') : ''}`}
+                                                            style={{background: c.situacao ? undefined : '#64748b'}}>
+                                                            {c.situacao || '--'}
+                                                        </span>
                                                         <select 
                                                             value={c.situacao || ''}
                                                             onChange={(e) => handleStatus(c.id, e.target.value)}
-                                                            className={`status-badge ${c.situacao ? 'status-' + c.situacao.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-') : ''}`}
-                                                            style={{
-                                                                border: 'none',
-                                                                cursor: 'pointer',
-                                                                fontWeight: '600',
-                                                                fontSize: '10px',
-                                                                background: c.situacao ? undefined : '#64748b'
-                                                            }}
+                                                            style={{opacity:0, position:'absolute', top:0, left:0, width:'100%', height:'100%', cursor:'pointer', zIndex:2}}
                                                         >
                                                             <option value="">--</option>
                                                             {listas.situacoes.map(s => (
                                                                 <option key={s} value={s}>{s}</option>
                                                             ))}
                                                         </select>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td>{c.terapia}</td>
@@ -1319,7 +1528,7 @@
                                                 <td>{c.cbo}</td>
                                                 <td>{c.cid}</td>
                                                 <td>{c.responsavelTecnico}</td>
-                                                <td>{c.obs}</td>
+                                                <td style={{maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}} title={c.obs}>{c.obs}</td>
                                                 <td>
                                                     <span className={`status-badge ${c.situacao ? 'status-' + c.situacao.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-') : ''}`}>
                                                         {c.situacao}
@@ -1356,7 +1565,7 @@
                     {totalPaginas > 1 && (
                         <div className="pagination">
                             <button className="btn btn-secondary" onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1}>◀ Anterior</button>
-                            <span>Página {pagina} de {totalPaginas} ({window.totalFiltradas || 0} registros)</span>
+                            <span>Página {pagina} de {totalPaginas} | Ativos: {window.totalAtivos || 0} | Cancelados: {window.totalCanceladas || 0} | Total: {window.totalGeral || 0}</span>
                             <button className="btn btn-secondary" onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}>Próxima ▶</button>
                         </div>
                     )}
@@ -1371,11 +1580,14 @@
                             onClose={() => setShowModal(false)}
                         />
                     )}
+                    <div style={{textAlign: 'center', padding: '8px', marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)', opacity: 0.5}}>
+                        v1.15
+                    </div>
                 </div>
             );
         }
 
-        function ConfigScreen({ listas, addToList, removeFromList, removeMultipleFromList, onClose, temaEscuro, setTemaEscuro }) {
+        function ConfigScreen({ listas, addToList, removeFromList, removeMultipleFromList, onClose, temaEscuro, setTemaEscuro, temAtualizacao, salvando, ano, mes, setConsultas, setTemAtualizacao, ultimaVersaoSheets }) {
             const [newValues, setNewValues] = useState({
                 convenios: '',
                 unidades: '',
@@ -1452,7 +1664,8 @@
                                         id: l.id || Date.now() + i,
                                         mes: Number(l.mes),
                                         ano: Number(l.ano),
-                                        quantidade: l.quantidade !== '' ? Number(l.quantidade) : ''
+                                        quantidade: l.quantidade !== '' ? Number(l.quantidade) : '',
+                            terapia: String(l.terapia !== undefined && l.terapia !== null ? l.terapia : '').trim()
                                     })));
                                     ultimaVersaoSheets.current = JSON.stringify(linhas);
                                 }
