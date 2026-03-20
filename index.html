@@ -447,6 +447,7 @@
 
         const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzZEUYTaxpV2kt5a0MUfa9nMHXqwm9m-AmUNeRKmlvJdoS2NUchMijaKYuaDUIM4jYz/exec';
 
+        // Salva a planilha toda (usado apenas na importação)
         async function salvarNoSheets(aba, linhas) {
             try {
                 if (!linhas || linhas.length === 0) return;
@@ -466,6 +467,39 @@
                     });
                 }
             } catch(e) { console.error('Sheets save error:', e); }
+        }
+
+        // Salva um único registro (inserir ou atualizar)
+        async function salvarRegistro(aba, registro) {
+            try {
+                await fetch(SHEETS_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ aba, modo: 'upsert', registro })
+                });
+            } catch(e) { console.error('Sheets upsert error:', e); }
+        }
+
+        // Exclui um único registro por ID
+        async function excluirRegistro(aba, id) {
+            try {
+                await fetch(SHEETS_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ aba, modo: 'excluir', id })
+                });
+            } catch(e) { console.error('Sheets delete error:', e); }
+        }
+
+        // Exclui múltiplos registros por ID
+        async function excluirRegistros(aba, ids) {
+            try {
+                await fetch(SHEETS_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ aba, modo: 'excluir_lote', ids })
+                });
+            } catch(e) { console.error('Sheets delete batch error:', e); }
         }
 
         async function carregarDoSheets(aba) {
@@ -690,7 +724,10 @@
                 const novaConsulta = { ...c, id: Date.now(), mes, ano };
                 const novasConsultas = [...consultas, novaConsulta];
                 setConsultas(novasConsultas);
-                salvar(novasConsultas);
+                // Salva só o novo registro
+                const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                setSalvando(true);
+                salvarRegistro(aba, novaConsulta).then(() => setSalvando(false));
                 setShowModal(false);
                 
                 // Calcular em qual página o paciente ficou
@@ -728,7 +765,10 @@
             const handleEdit = (c) => {
                 const novas = consultas.map(x => x.id === c.id ? c : x);
                 setConsultas(novas);
-                salvar(novas);
+                // Salva só o registro alterado
+                const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                setSalvando(true);
+                salvarRegistro(aba, c).then(() => setSalvando(false));
                 setShowModal(false);
             };
 
@@ -736,7 +776,9 @@
                 if (confirm('Excluir?')) {
                     const novas = consultas.filter(c => c.id !== id);
                     setConsultas(novas);
-                    salvar(novas);
+                    const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                    setSalvando(true);
+                    excluirRegistro(aba, id).then(() => setSalvando(false));
                 }
             };
 
@@ -791,7 +833,9 @@
                 if (confirm(`Excluir ${selectedIds.length} consultas selecionadas?`)) {
                     const novas = consultas.filter(c => !selectedIds.includes(c.id));
                     setConsultas(novas);
-                    salvar(novas);
+                    const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                    setSalvando(true);
+                    excluirRegistros(aba, selectedIds).then(() => setSalvando(false));
                     setSelectedIds([]);
                 }
             };
@@ -799,13 +843,19 @@
             const handleStatus = (id, situacao) => {
                 const novas = consultas.map(c => c.id === id ? { ...c, situacao } : c);
                 setConsultas(novas);
-                salvar(novas);
+                const registro = novas.find(c => c.id === id);
+                const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                setSalvando(true);
+                salvarRegistro(aba, registro).then(() => setSalvando(false));
             };
 
             const handleDupExata = (c) => {
-                const novas = [...consultas, { ...c, id: Date.now() }];
+                const novo = { ...c, id: Date.now() };
+                const novas = [...consultas, novo];
                 setConsultas(novas);
-                salvar(novas);
+                const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                setSalvando(true);
+                salvarRegistro(aba, novo).then(() => setSalvando(false));
             };
 
             const handleDupEdit = (c) => {
