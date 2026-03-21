@@ -445,69 +445,145 @@
         };
 
 
-        const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzZEUYTaxpV2kt5a0MUfa9nMHXqwm9m-AmUNeRKmlvJdoS2NUchMijaKYuaDUIM4jYz/exec';
+        const PB_URL = 'http://187.77.246.135:8090';
 
-        // Salva a planilha toda (usado apenas na importação)
+        // Carrega consultas do mês do PocketBase
+        async function carregarDoSheets(aba) {
+            try {
+                const [ano, mes] = aba.split('-').map(Number);
+                const mesIdx = mes - 1;
+                let todos = [];
+                let pagina = 1;
+                while (true) {
+                    const res = await fetch(`${PB_URL}/api/collections/consultas/records?filter=(mes=${mesIdx}%26%26ano=${ano})&perPage=200&page=${pagina}`);
+                    const data = await res.json();
+                    if (!data.items || data.items.length === 0) break;
+                    todos = todos.concat(data.items);
+                    if (todos.length >= data.totalItems) break;
+                    pagina++;
+                }
+                return todos.map(item => ({
+                    ...item,
+                    id: item.id,
+                    mes: Number(item.mes),
+                    ano: Number(item.ano),
+                    quantidade: item.quantidade !== '' ? item.quantidade : '',
+                    terapia: String(item.terapia || '').trim()
+                }));
+            } catch(e) { console.error('PB load error:', e); return null; }
+        }
+
+        // Salva lote na importação
         async function salvarNoSheets(aba, linhas) {
             try {
                 if (!linhas || linhas.length === 0) return;
-                const cabecalho = Object.keys(linhas[0]);
-                const LOTE = 200;
-                await fetch(SHEETS_URL, {
-                    method: 'POST', mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ aba, modo: 'lote', cabecalho, linhas: linhas.slice(0, LOTE) })
-                });
-                for (let i = LOTE; i < linhas.length; i += LOTE) {
-                    await new Promise(r => setTimeout(r, 600));
-                    await fetch(SHEETS_URL, {
-                        method: 'POST', mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ aba, modo: 'lote', cabecalho: null, linhas: linhas.slice(i, i + LOTE) })
-                    });
+                // Primeiro apaga todos os registros do mês
+                const [ano, mes] = aba.split('-').map(Number);
+                const mesIdx = mes - 1;
+                let pagina = 1;
+                while (true) {
+                    const res = await fetch(`${PB_URL}/api/collections/consultas/records?filter=(mes=${mesIdx}%26%26ano=${ano})&perPage=200&page=${pagina}`);
+                    const data = await res.json();
+                    if (!data.items || data.items.length === 0) break;
+                    await Promise.all(data.items.map(item =>
+                        fetch(`${PB_URL}/api/collections/consultas/records/${item.id}`, { method: 'DELETE' })
+                    ));
+                    if (data.items.length < 200) break;
                 }
-            } catch(e) { console.error('Sheets save error:', e); }
+                // Insere em lotes de 50
+                const LOTE = 50;
+                for (let i = 0; i < linhas.length; i += LOTE) {
+                    const lote = linhas.slice(i, i + LOTE);
+                    await Promise.all(lote.map(linha => {
+                        const body = {
+                            convenio: String(linha.convenio || ''),
+                            unidade: String(linha.unidade || ''),
+                            diaSemana: String(linha.diaSemana || ''),
+                            guia: String(linha.guia || ''),
+                            data: String(linha.data || ''),
+                            senha: String(linha.senha || ''),
+                            numeroCarteirinha: String(linha.numeroCarteirinha || ''),
+                            nomePaciente: String(linha.nomePaciente || ''),
+                            terapia: String(linha.terapia || ''),
+                            quantidade: String(linha.quantidade || ''),
+                            nomeMedico: String(linha.nomeMedico || ''),
+                            conselho: String(linha.conselho || ''),
+                            cbo: String(linha.cbo || ''),
+                            cid: String(linha.cid || ''),
+                            responsavelTecnico: String(linha.responsavelTecnico || ''),
+                            obs: String(linha.obs || ''),
+                            situacao: String(linha.situacao || ''),
+                            mes: Number(linha.mes),
+                            ano: Number(linha.ano)
+                        };
+                        return fetch(`${PB_URL}/api/collections/consultas/records`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                    }));
+                    await new Promise(r => setTimeout(r, 100));
+                }
+            } catch(e) { console.error('PB import error:', e); }
         }
 
-        // Salva um único registro (inserir ou atualizar)
+        // Salva um único registro
         async function salvarRegistro(aba, registro) {
             try {
-                await fetch(SHEETS_URL, {
-                    method: 'POST', mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ aba, modo: 'upsert', registro })
-                });
-            } catch(e) { console.error('Sheets upsert error:', e); }
+                const body = {
+                    convenio: String(registro.convenio || ''),
+                    unidade: String(registro.unidade || ''),
+                    diaSemana: String(registro.diaSemana || ''),
+                    guia: String(registro.guia || ''),
+                    data: String(registro.data || ''),
+                    senha: String(registro.senha || ''),
+                    numeroCarteirinha: String(registro.numeroCarteirinha || ''),
+                    nomePaciente: String(registro.nomePaciente || ''),
+                    terapia: String(registro.terapia || ''),
+                    quantidade: String(registro.quantidade || ''),
+                    nomeMedico: String(registro.nomeMedico || ''),
+                    conselho: String(registro.conselho || ''),
+                    cbo: String(registro.cbo || ''),
+                    cid: String(registro.cid || ''),
+                    responsavelTecnico: String(registro.responsavelTecnico || ''),
+                    obs: String(registro.obs || ''),
+                    situacao: String(registro.situacao || ''),
+                    mes: Number(registro.mes),
+                    ano: Number(registro.ano)
+                };
+                // Verifica se já existe no PocketBase (tem id do PB)
+                if (registro.pbId) {
+                    await fetch(`${PB_URL}/api/collections/consultas/records/${registro.pbId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                } else {
+                    const res = await fetch(`${PB_URL}/api/collections/consultas/records`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    const data = await res.json();
+                    return data.id; // retorna o id do PocketBase
+                }
+            } catch(e) { console.error('PB save error:', e); }
         }
 
-        // Exclui um único registro por ID
+        // Exclui um único registro
         async function excluirRegistro(aba, id) {
             try {
-                await fetch(SHEETS_URL, {
-                    method: 'POST', mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ aba, modo: 'excluir', id })
-                });
-            } catch(e) { console.error('Sheets delete error:', e); }
+                await fetch(`${PB_URL}/api/collections/consultas/records/${id}`, { method: 'DELETE' });
+            } catch(e) { console.error('PB delete error:', e); }
         }
 
-        // Exclui múltiplos registros por ID
+        // Exclui múltiplos registros
         async function excluirRegistros(aba, ids) {
             try {
-                await fetch(SHEETS_URL, {
-                    method: 'POST', mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ aba, modo: 'excluir_lote', ids })
-                });
-            } catch(e) { console.error('Sheets delete batch error:', e); }
-        }
-
-        async function carregarDoSheets(aba) {
-            try {
-                const res = await fetch(`${SHEETS_URL}?aba=${encodeURIComponent(aba)}`);
-                const data = await res.json();
-                return data.linhas || [];
-            } catch(e) { return null; }
+                await Promise.all(ids.map(id =>
+                    fetch(`${PB_URL}/api/collections/consultas/records/${id}`, { method: 'DELETE' })
+                ));
+            } catch(e) { console.error('PB delete batch error:', e); }
         }
 
                 function App() {
@@ -539,25 +615,44 @@
             const [salvando, setSalvando] = useState(false);
             const ultimaVersaoSheets = React.useRef('');
 
-            // Carregar do Sheets uma vez ao abrir
+            // Carregar do PocketBase uma vez ao abrir
             useEffect(() => {
                 if (jaCarregou.current) return;
                 jaCarregou.current = true;
                 const aba = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
                 carregarDoSheets(aba).then(linhas => {
                     if (linhas && linhas.length > 0) {
-                        setConsultas(linhas.map((l, i) => ({ 
+                        setConsultas(linhas.map(l => ({ 
                             ...l, 
-                            id: l.id || Date.now() + i,
+                            id: l.id, // id do PocketBase
                             mes: Number(l.mes),
                             ano: Number(l.ano),
-                            quantidade: l.quantidade !== '' ? Number(l.quantidade) : '',
-                            terapia: String(l.terapia !== undefined && l.terapia !== null ? l.terapia : '').trim()
+                            quantidade: l.quantidade !== '' ? l.quantidade : '',
+                            terapia: String(l.terapia || '').trim()
                         })));
                         ultimaVersaoSheets.current = JSON.stringify(linhas);
                     }
                 });
             }, []);
+
+            // Carregar dados ao mudar de mês
+            useEffect(() => {
+                if (!jaCarregou.current) return;
+                const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                setSalvando(true);
+                carregarDoSheets(aba).then(linhas => {
+                    setConsultas((linhas || []).map(l => ({
+                        ...l,
+                        id: l.id,
+                        mes: Number(l.mes),
+                        ano: Number(l.ano),
+                        quantidade: l.quantidade !== '' ? l.quantidade : '',
+                        terapia: String(l.terapia || '').trim()
+                    })));
+                    ultimaVersaoSheets.current = JSON.stringify(linhas || []);
+                    setSalvando(false);
+                });
+            }, [mes, ano]);
 
             // Verificar atualizações a cada 3 minutos
             useEffect(() => {
@@ -721,45 +816,27 @@
             const totalPaginas = Math.ceil((window.totalFiltradas || 0) / porPagina);
 
             const handleAdd = (c) => {
-                const novaConsulta = { ...c, id: Date.now(), mes, ano };
-                const novasConsultas = [...consultas, novaConsulta];
-                setConsultas(novasConsultas);
-                // Salva só o novo registro
-                const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                const novaConsulta = { ...c, id: 'temp_' + Date.now(), mes, ano };
                 setSalvando(true);
-                salvarRegistro(aba, novaConsulta).then(() => setSalvando(false));
+                salvarRegistro(`${ano}-${String(mes+1).padStart(2,'0')}`, novaConsulta).then((pbId) => {
+                    setSalvando(false);
+                    // Recarrega dados do PocketBase para garantir ordem correta
+                    const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
+                    carregarDoSheets(aba).then(linhas => {
+                        if (linhas && linhas.length > 0) {
+                            setConsultas(linhas.map((l, i) => ({
+                                ...l,
+                                id: l.id || l.pbId,
+                                mes: Number(l.mes),
+                                ano: Number(l.ano),
+                                terapia: String(l.terapia !== undefined && l.terapia !== null ? l.terapia : '').trim()
+                            })));
+                        }
+                    });
+                    setPagina(1);
+                    alert(`✅ ${c.nomePaciente} adicionado(a)!`);
+                });
                 setShowModal(false);
-                
-                // Calcular em qual página o paciente ficou
-                setTimeout(() => {
-                    // Filtrar consultas do mês atual e ordenar
-                    const consultasDoMes = novasConsultas
-                        .filter(x => Number(x.mes) === Number(mes) && Number(x.ano) === Number(ano))
-                        .sort((a, b) => {
-                            const nomeA = (a.nomePaciente || '').toLowerCase();
-                            const nomeB = (b.nomePaciente || '').toLowerCase();
-                            return nomeA.localeCompare(nomeB);
-                        });
-                    
-                    // Encontrar posição do paciente
-                    const posicao = consultasDoMes.findIndex(x => x.id === novaConsulta.id);
-                    const paginaPaciente = Math.floor(posicao / porPagina) + 1;
-                    const primeiraLetra = (c.nomePaciente || '').charAt(0).toUpperCase();
-                    
-                    // Mostrar mensagem com opção de ir para a página
-                    const irParaPagina = confirm(
-                        `✅ ${c.nomePaciente} adicionado(a)!\n\n` +
-                        `📍 Localização: Página ${paginaPaciente} (letra "${primeiraLetra}")\n` +
-                        `📊 Total no mês: ${consultasDoMes.length} consultas\n\n` +
-                        `Deseja ir para a página ${paginaPaciente}?`
-                    );
-                    
-                    if (irParaPagina) {
-                        setPagina(paginaPaciente);
-                    } else {
-                        setPagina(1); // Volta para primeira página
-                    }
-                }, 100);
             };
 
             const handleEdit = (c) => {
@@ -1209,13 +1286,13 @@
                             const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
                             carregarDoSheets(aba).then(linhas => {
                                 if (linhas && linhas.length > 0) {
-                                    setConsultas(linhas.map((l, i) => ({ 
+                                    setConsultas(linhas.map(l => ({ 
                                         ...l, 
-                                        id: l.id || Date.now() + i,
+                                        id: l.id,
                                         mes: Number(l.mes),
                                         ano: Number(l.ano),
-                                        quantidade: l.quantidade !== '' ? Number(l.quantidade) : '',
-                            terapia: String(l.terapia !== undefined && l.terapia !== null ? l.terapia : '').trim()
+                                        quantidade: l.quantidade !== '' ? l.quantidade : '',
+                                        terapia: String(l.terapia || '').trim()
                                     })));
                                     ultimaVersaoSheets.current = JSON.stringify(linhas);
                                 }
@@ -1631,7 +1708,7 @@
                         />
                     )}
                     <div style={{textAlign: 'center', padding: '8px', marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)', opacity: 0.5}}>
-                        v1.15
+                        v1.16 — PocketBase
                     </div>
                 </div>
             );
@@ -1709,13 +1786,13 @@
                             const aba = `${ano}-${String(mes+1).padStart(2,'0')}`;
                             carregarDoSheets(aba).then(linhas => {
                                 if (linhas && linhas.length > 0) {
-                                    setConsultas(linhas.map((l, i) => ({ 
+                                    setConsultas(linhas.map(l => ({ 
                                         ...l, 
-                                        id: l.id || Date.now() + i,
+                                        id: l.id,
                                         mes: Number(l.mes),
                                         ano: Number(l.ano),
-                                        quantidade: l.quantidade !== '' ? Number(l.quantidade) : '',
-                            terapia: String(l.terapia !== undefined && l.terapia !== null ? l.terapia : '').trim()
+                                        quantidade: l.quantidade !== '' ? l.quantidade : '',
+                                        terapia: String(l.terapia || '').trim()
                                     })));
                                     ultimaVersaoSheets.current = JSON.stringify(linhas);
                                 }
